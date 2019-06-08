@@ -17,7 +17,7 @@ from sumolib import checkBinary  # Checks for the binary in environ vars
 import traci
 
 MAX_STEPS = 1000
-GRAPH_PICKLED_FILE_LOCATION = 'graph.gpickle'
+GRAPH_PICKLED_FILE_LOCATION = 'graph/graph.gpickle'
 PARKING_NEED_PROBABILITY = 0.4
 # random.seed(0)
 
@@ -116,6 +116,6 @@ if __name__ == "__main__":
     totalParkingSpots = getTotalParkingSpots()
 
     # traci starts sumo as a subprocess and then this script connects and runs
-    traci.start([sumoBinary, "-c", "aco.sumocfg",
-                             "--tripinfo-output", "tripinfo.xml"])
+    traci.start([sumoBinary, "-c", "sumo/aco.sumocfg",
+                             "--tripinfo-output", "output/tripinfo.xml"])
     run()

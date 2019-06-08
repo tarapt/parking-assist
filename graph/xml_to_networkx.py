@@ -2,7 +2,7 @@ import networkx as nx
 import random
 import xmltodict
 
-EDGES_XML_FILE = 'aco.edg.xml'
+EDGES_XML_FILE = '../sumo/aco.edg.xml'
 GRAPH_PICKLED_FILE_SAVE_LOCATION = 'graph.gpickle'
 
 random.seed(0)
