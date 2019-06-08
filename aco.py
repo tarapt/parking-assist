@@ -30,20 +30,20 @@ def get_options():
     return options
 
 
-def getAvailableParkingSpotsFromEdgeID(edgeID):
-    return G.edges[edgeDict[edgeID]]['parking_capacity'] - G.edges[edgeDict[edgeID]]['parked_vehicles_count']
-
-
-def getAvailableParkingSpotsFromEdge(edge):
+def getAvailableParkingSpots(edge):
     return G.edges[edge]['parking_capacity'] - G.edges[edge]['parked_vehicles_count']
 
 
-def incrementParkedCount(edgeID):
-    G[edgeDict[edgeID]]['parked_vehicles_count'] += 1
+def getParkedVehcilesCount(edge):
+    return G.edges[edge]['parked_vehicles_count']
+
+
+def incrementParkedCount(edge):
+    G.edges[edge]['parked_vehicles_count'] += 1
 
 
 def decrementParkedCount(edge):
-    G[edge]['parked_vehicles_count'] -= 1
+    G.edges[edge]['parked_vehicles_count'] -= 1
 
 
 # contains TraCI control loop
@@ -64,22 +64,20 @@ def run():
 
                 # the vehicle may be on a junction or an edge
                 if edgeDict.get(currentRoad):
-                    availableParkingSpots = getAvailableParkingSpotsFromEdgeID(currentRoad)
+                    currentEdge = edgeDict[currentRoad]
+                    availableParkingSpots = getAvailableParkingSpots(currentEdge)
                     if availableParkingSpots > 0:
                         # park the vehicle here
-                        incrementParkedCount(currentRoad)
+                        incrementParkedCount(currentEdge)
 
                         # moving_vehicles_count doesn't change as we spawn a new vehicle on the current road
 
-                        # randomly choose an edge which has some free parking spots
+                        # randomly choose an edge which has some vehicle parked in it and remove a vehicle from it
                         candidateList = []
-                        for edge in edgeDict.values():
-                            availableParkingSpots = getAvailableParkingSpotsFromEdge(edge)
-                            if edge != edgeDict[currentRoad] and availableParkingSpots > 0:
+                        for edgeID, edge in edgeDict.items():
+                            if edgeID != currentRoad and getParkedVehcilesCount(edge) > 0:
                                 candidateList.append(edge)
                         randomEdge = random.choice(candidateList)
-
-                        # remove the parked vehicle from the randomly choosen edge
                         decrementParkedCount(randomEdge)
         step += 1
 
