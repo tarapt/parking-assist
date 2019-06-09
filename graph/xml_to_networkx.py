@@ -2,7 +2,7 @@ import networkx as nx
 import random
 import xmltodict
 
-EDGES_XML_FILE = '../sumo/aco.edg.xml'
+EDGES_XML_FILE = '../sumo/aco.net.xml'
 GRAPH_PICKLED_FILE_SAVE_LOCATION = 'graph.gpickle'
 
 random.seed(0)
@@ -32,10 +32,13 @@ def distribute_parked_vehicles(G, percentOfVehiclesToPark):
 with open(EDGES_XML_FILE) as fd:
     G = nx.DiGraph()
     doc = xmltodict.parse(fd.read())
-    for x in doc['edges']['edge']:
-        G.add_edge(x['@from'], x['@to'], id=x['@id'])
+    edgeList = doc['net']['edge']
+    for edge in edgeList:
+        # filter out internal roads
+        if edge.get('@from') and edge.get('@to'):
+            G.add_edge(edge['@from'], edge['@to'], id=edge['@id'], length=edge['lane']['@length'])
 
-    # initialize the edges
+    # # initialize the edges
     for edge in G.edges(data=True):
         edge[2]['parking_capacity'] = 0
         edge[2]['parked_vehicles_count'] = 0
