@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on Sun 09 Jun 2019 19:00:49 IST by Eclipse SUMO GUI Version 1.2.0
+<!-- generated on Tue 11 Jun 2019 01:36:04 IST by Eclipse SUMO GUI Version 1.2.0
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
 
     <input>
         <net-file value="sumo/aco.net.xml"/>
         <route-files value="sumo/aco.rou.xml"/>
+        <additional-files value="sumo/aco.add.xml"/>
     </input>
 
     <output>
@@ -13,17 +14,11 @@
     </output>
 
     <traci_server>
-        <remote-port value="43877"/>
+        <remote-port value="44525"/>
     </traci_server>
 
 </configuration>
 -->
 
 <tripinfos xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/tripinfo_file.xsd">
-    <tripinfo id="veh0" depart="1.00" departLane="gneE0_0" departPos="5.10" departSpeed="0.00" departDelay="0.00" arrival="151.00" arrivalLane="gneE13_0" arrivalPos="96.80" arrivalSpeed="14.13" duration="150.00" routeLength="1372.48" waitingTime="0.00" waitingCount="0" stopTime="0.00" timeLoss="53.80" rerouteNo="0" devices="tripinfo_veh0" vType="Car" speedFactor="1.06" vaporized=""/>
-    <tripinfo id="veh1" depart="5.00" departLane="gneE0_0" departPos="5.10" departSpeed="0.00" departDelay="4.00" arrival="163.00" arrivalLane="gneE13_0" arrivalPos="96.80" arrivalSpeed="13.03" duration="158.00" routeLength="1372.48" waitingTime="0.00" waitingCount="0" stopTime="0.00" timeLoss="47.60" rerouteNo="0" devices="tripinfo_veh1" vType="Car" speedFactor="0.94" vaporized=""/>
-    <tripinfo id="veh2" depart="9.00" departLane="gneE0_0" departPos="5.10" departSpeed="0.00" departDelay="8.00" arrival="165.00" arrivalLane="gneE13_0" arrivalPos="96.80" arrivalSpeed="13.94" duration="156.00" routeLength="1372.48" waitingTime="0.00" waitingCount="0" stopTime="0.00" timeLoss="55.16" rerouteNo="0" devices="tripinfo_veh2" vType="Car" speedFactor="1.01" vaporized=""/>
-    <tripinfo id="veh3" depart="13.00" departLane="gneE0_0" departPos="5.10" departSpeed="0.00" departDelay="12.00" arrival="167.00" arrivalLane="gneE13_0" arrivalPos="96.80" arrivalSpeed="14.22" duration="154.00" routeLength="1372.48" waitingTime="0.00" waitingCount="0" stopTime="0.00" timeLoss="58.65" rerouteNo="0" devices="tripinfo_veh3" vType="Car" speedFactor="1.08" vaporized=""/>
-    <tripinfo id="veh4" depart="17.00" departLane="gneE0_0" departPos="5.10" departSpeed="0.00" departDelay="16.00" arrival="171.00" arrivalLane="gneE13_0" arrivalPos="96.80" arrivalSpeed="14.31" duration="154.00" routeLength="1372.48" waitingTime="0.00" waitingCount="0" stopTime="0.00" timeLoss="54.57" rerouteNo="0" devices="tripinfo_veh4" vType="Car" speedFactor="1.03" vaporized=""/>
-    <tripinfo id="veh5" depart="21.00" departLane="gneE0_0" departPos="5.10" departSpeed="0.00" departDelay="20.00" arrival="187.00" arrivalLane="gneE13_0" arrivalPos="96.80" arrivalSpeed="11.54" duration="166.00" routeLength="1372.48" waitingTime="0.00" waitingCount="0" stopTime="0.00" timeLoss="43.62" rerouteNo="0" devices="tripinfo_veh5" vType="Car" speedFactor="0.83" vaporized=""/>
 </tripinfos>

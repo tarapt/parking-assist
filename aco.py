@@ -16,9 +16,8 @@ else:
 from sumolib import checkBinary  # Checks for the binary in environ vars
 import traci
 
-MAX_STEPS = 1000
 GRAPH_PICKLED_FILE_LOCATION = 'graph/graph.gpickle'
-PARKING_NEED_PROBABILITY = 0.4
+PARKING_NEED_PROBABILITY = 1
 # random.seed(0)
 
 
@@ -46,10 +45,13 @@ def decrementParkedCount(edge):
     G.edges[edge]['parked_vehicles_count'] -= 1
 
 
+vehicleTravelInfo = {}
+
+
 # contains TraCI control loop
-def run():
+def run(max_steps=500):
     step = 1
-    while traci.simulation.getMinExpectedNumber() > 0 and step < MAX_STEPS:
+    while traci.simulation.getMinExpectedNumber() > 0 and step < max_steps:
         traci.simulationStep()
         print("Simulation Step: {}".format(step))
 
@@ -59,26 +61,55 @@ def run():
             datadict['moving_vehicles_count'] = traci.edge.getLastStepVehicleNumber(edgeId)
 
         for vehID in traci.vehicle.getIDList():
-            if random.random() < PARKING_NEED_PROBABILITY:
-                currentRoad = traci.vehicle.getRoadID(vehID)
+            currentEdgeID = traci.vehicle.getRoadID(vehID)
+            if edgeDict.get(currentEdgeID):
+                currentEdge = edgeDict[currentEdgeID]
+                candidates = []
+                for edge in G[currentEdge[1]].values():
+                    nextEdgeID = edge['id']
+                    x = nextEdgeID
+                    y = currentEdgeID
+                    if x[0] == '-':
+                        x = x[1:]
+                    if y[0] == '-':
+                        y = y[1:]
+                    if x == y:
+                        continue
+                    candidates.append(nextEdgeID)
+                nextEdgeID = random.choice(candidates)
+                traci.vehicle.setRoute(vehID, [currentEdgeID, nextEdgeID])
 
-                # the vehicle may be on a junction or an edge
-                if edgeDict.get(currentRoad):
-                    currentEdge = edgeDict[currentRoad]
-                    availableParkingSpots = getAvailableParkingSpots(currentEdge)
-                    if availableParkingSpots > 0:
-                        # park the vehicle here
-                        incrementParkedCount(currentEdge)
+            # if vehicleTravelInfo.get(vehID) is None:
+            #     vehicleTravelInfo[vehID] = {'start_distance_reading': 0, 'finish_distance_reading': None, 'overall_route': traci.vehicle.getRoute(vehID), 'start_route_id': 0, 'finish_route_id': None}
+            # if random.random() < PARKING_NEED_PROBABILITY:
+            #     currentEdgeID = traci.vehicle.getRoadID(vehID)
 
-                        # moving_vehicles_count doesn't change as we spawn a new vehicle on the current road
+            #     # the vehicle may be on a junction or an edge
+            #     if edgeDict.get(currentEdgeID):
+            #         currentEdge = edgeDict[currentEdgeID]
+            #         availableParkingSpots = getAvailableParkingSpots(currentEdge)
+            #         if availableParkingSpots > 0:
+            #             # park the vehicle here
+            #             # traci.vehicle.setParkingAreaStop(vehID, 'parkingArea_gneE0_0_1', duration=100000)
+            #             vehicleTravelInfo[vehID]['finish_distance_reading'] = traci.vehicle.getDistance(vehID)
+            #             print("Vehicle {} covered {} distance before parking.".format(vehID, vehicleTravelInfo[vehID]['finish_distance_reading'] - vehicleTravelInfo[vehID]['start_distance_reading']))
+            #             vehRoute = traci.vehicle.getRoute(vehID)
+            #             vehRouteIndex = vehRoute[traci.vehicle.getRouteIndex(vehID)]
+            #             print("Route: {}".format(vehRoute))
+            #             print("Vehicle is at index {}, which is edge {} on this route.".format(vehRouteIndex, vehRoute[vehRouteIndex]))
+            #             incrementParkedCount(currentEdge)
 
-                        # randomly choose an edge which has some vehicle parked in it and remove a vehicle from it
-                        candidateList = []
-                        for edgeID, edge in edgeDict.items():
-                            if edgeID != currentRoad and getParkedVehcilesCount(edge) > 0:
-                                candidateList.append(edge)
-                        randomEdge = random.choice(candidateList)
-                        decrementParkedCount(randomEdge)
+            #             # randomly choose an edge which has some vehicle parked in it and remove a vehicle from it
+            #             candidateList = []
+            #             for edgeID, edge in edgeDict.items():
+            #                 if edgeID != currentEdgeID and getParkedVehcilesCount(edge) > 0:
+            #                     candidateList.append(edge)
+            #             randomEdge = random.choice(candidateList)
+            #             decrementParkedCount(randomEdge)
+
+            #             # spawn a new vehicle here, so that moving_vehicles_count doesn't change, update the distance readings
+            #             vehicleTravelInfo[vehID]['start_distance_reading'] = vehicleTravelInfo[vehID]['finish_distance_reading']
+            #             vehicleTravelInfo[vehID]['finish_distance_reading'] = None
         step += 1
 
     traci.close()

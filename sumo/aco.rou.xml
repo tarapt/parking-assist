@@ -2,13 +2,24 @@
 <routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
   <vType accel="1.0" decel="5.0" id="Car" length="5.0" minGap="2.0" maxSpeed="50.0" sigma="0" />
   
-  <!-- Run a dfs to get all possible paths and select some path from there -->
-  <route id="route0" edges="gneE0 gneE1 gneE2 gneE3 gneE4 gneE5 gneE6 gneE7 gneE8 gneE9 gneE10 gneE11 gneE12 gneE13" />
+  <!-- <route id="route1" edges="gneE88" /> -->
+  <!-- <route id="route1" edges="gneE90" /> -->
+  <!-- <route id="route1" edges="gneE92" /> -->
+  <!-- <route id="route1" edges="gneE93" /> -->
 
-  <vehicle depart="1" id="veh0" route="route0" type="Car" />
-  <vehicle depart="1" id="veh1" route="route0" type="Car" />
-  <vehicle depart="1" id="veh2" route="route0" type="Car" />
-  <vehicle depart="1" id="veh3" route="route0" type="Car" />
-  <vehicle depart="1" id="veh4" route="route0" type="Car" />
-  <vehicle depart="1" id="veh5" route="route0" type="Car" />
+  <flow id="veh_type1" color="1,1,0" begin="0" end= "720" period="10" type="Car">
+    <route edges="gneE88" />
+  </flow>
+
+  <flow id="veh_type2" color="1,0,1" begin="0" end= "720" period="10" type="Car">
+    <route edges="gneE90" />
+  </flow>
+
+  <flow id="veh_type3" color="1,0,0" begin="0" end= "720" period="10" type="Car">
+    <route edges="gneE92" />
+  </flow>
+
+  <flow id="veh_type4" color="0,1,0" begin="0" end= "720" period="10" type="Car">
+    <route edges="gneE93" />
+  </flow>
 </routes>
