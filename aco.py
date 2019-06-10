@@ -1,10 +1,15 @@
-#!/usr/bin/env python
-
 import os
 import sys
 import optparse
 import random
 import networkx as nx
+import logging
+
+logging.basicConfig(
+    format='%(levelname)s: %(message)s',
+    level=logging.DEBUG,
+    filename='output/traci.log')
+
 # we need to import some python modules from the $SUMO_HOME/tools directory
 if 'SUMO_HOME' in os.environ:
     tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
@@ -29,20 +34,20 @@ def get_options():
     return options
 
 
-def getAvailableParkingSpots(edge):
-    return G.edges[edge]['parking_capacity'] - G.edges[edge]['parked_vehicles_count']
+# def getAvailableParkingSpots(edge):
+#     return G.edges[edge]['parking_capacity'] - G.edges[edge]['parked_vehicles_count']
 
 
-def getParkedVehcilesCount(edge):
-    return G.edges[edge]['parked_vehicles_count']
+# def getParkedVehcilesCount(edge):
+#     return G.edges[edge]['parked_vehicles_count']
 
 
-def incrementParkedCount(edge):
-    G.edges[edge]['parked_vehicles_count'] += 1
+# def incrementParkedCount(edge):
+#     G.edges[edge]['parked_vehicles_count'] += 1
 
 
-def decrementParkedCount(edge):
-    G.edges[edge]['parked_vehicles_count'] -= 1
+# def decrementParkedCount(edge):
+#     G.edges[edge]['parked_vehicles_count'] -= 1
 
 
 vehicleTravelInfo = {}
@@ -56,28 +61,15 @@ def run(max_steps=500):
         print("Simulation Step: {}".format(step))
 
         # traci.edge.getIDList() returns info about lanes also, so access from the graph object
-        for e, datadict in G.edges.items():
-            edgeId = datadict['id']
-            datadict['moving_vehicles_count'] = traci.edge.getLastStepVehicleNumber(edgeId)
+        for node, datadict in G.nodes.items():
+            datadict['moving_vehicles_count'] = traci.edge.getLastStepVehicleNumber(node)
 
         for vehID in traci.vehicle.getIDList():
-            currentEdgeID = traci.vehicle.getRoadID(vehID)
-            if edgeDict.get(currentEdgeID):
-                currentEdge = edgeDict[currentEdgeID]
-                candidates = []
-                for edge in G[currentEdge[1]].values():
-                    nextEdgeID = edge['id']
-                    x = nextEdgeID
-                    y = currentEdgeID
-                    if x[0] == '-':
-                        x = x[1:]
-                    if y[0] == '-':
-                        y = y[1:]
-                    if x == y:
-                        continue
-                    candidates.append(nextEdgeID)
-                nextEdgeID = random.choice(candidates)
-                traci.vehicle.setRoute(vehID, [currentEdgeID, nextEdgeID])
+            currentRoadID = traci.vehicle.getRoadID(vehID)
+            if currentRoadID in G and not G.nodes[currentRoadID]['is_internal']:
+                nextRoadID = random.choice(list(G[currentRoadID].keys()))
+                logging.debug("{} {} {} {}".format(step, vehID, currentRoadID, nextRoadID))
+                traci.vehicle.setRoute(vehID, [currentRoadID, nextRoadID])
 
             # if vehicleTravelInfo.get(vehID) is None:
             #     vehicleTravelInfo[vehID] = {'start_distance_reading': 0, 'finish_distance_reading': None, 'overall_route': traci.vehicle.getRoute(vehID), 'start_route_id': 0, 'finish_route_id': None}
@@ -118,17 +110,11 @@ def run(max_steps=500):
 
 def getTotalParkingSpots():
     sum = 0
-    for e, datadict in G.edges.items():
+    for node, datadict in G.nodes.items():
         sum += datadict['parking_capacity']
     return sum
 
 
-def getEdgeDict():
-    for e, datadict in G.edges.items():
-        edgeDict[datadict['id']] = e
-
-
-# main entry point
 if __name__ == "__main__":
     options = get_options()
 
@@ -138,10 +124,8 @@ if __name__ == "__main__":
     else:
         sumoBinary = checkBinary('sumo-gui')
 
-    global G, edgeDict
+    global G
     G = nx.read_gpickle(GRAPH_PICKLED_FILE_LOCATION)
-    edgeDict = {}
-    getEdgeDict()
     totalParkingSpots = getTotalParkingSpots()
 
     # traci starts sumo as a subprocess and then this script connects and runs

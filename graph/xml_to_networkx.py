@@ -7,16 +7,16 @@ ADDITIONAL_XML_FILE = '../sumo/aco.add.xml'
 GRAPH_PICKLED_FILE_SAVE_LOCATION = 'graph.gpickle'
 
 random.seed(0)
-TOTAL_PARKING_SPOTS = 100
+TOTAL_PARKING_SPOTS = 500
 PERCENT_OF_VEHICLES_TO_PARK = 30
 
 
 def distribute_parking_spots(G):
     # select an edge randomly from those edges which have a parking area
-    edgeList = [e for e in G.edges() if len(G.edges[e]['parking_areas']) > 0]
+    nodeList = [n for n in G.nodes() if len(G.nodes[n]['parking_areas']) > 0]
     for i in range(TOTAL_PARKING_SPOTS):
-        randomEdge = random.choice(edgeList)
-        randomParkingArea = random.choice(G.edges[randomEdge]['parking_areas'])
+        randomNode = random.choice(nodeList)
+        randomParkingArea = random.choice(G.nodes[randomNode]['parking_areas'])
         randomParkingArea['@roadsideCapacity'] = str(int(randomParkingArea['@roadsideCapacity']) + 1)
 
 
@@ -33,8 +33,8 @@ def set_on_road_parking(value):
         fd.write(updatedAdditionalXml)
 
 
-def convert_xml_edges_to_networkx():
-    G = nx.DiGraph()
+def get_lane_information_from_xml():
+    laneDict = {}
     with open(NETWORK_XML_FILE) as fd:
         doc = xmltodict.parse(fd.read())
         edgeList = doc['net']['edge']
@@ -48,8 +48,17 @@ def convert_xml_edges_to_networkx():
                     lanes = [edge['lane']['@id']]
                     length = edge['lane']['@length']
                 for lane in lanes:
-                    laneDict[lane] = (edge['@from'], edge['@to'])
-                G.add_edge(edge['@from'], edge['@to'], id=edge['@id'], length=length, laneIDs=lanes, parking_areas=[])
+                    laneDict[lane] = {'edgeID': edge['@id'], 'length': length}
+    return laneDict
+
+
+def get_graph_from_xml_connections():
+    G = nx.DiGraph()
+    with open(NETWORK_XML_FILE) as fd:
+        doc = xmltodict.parse(fd.read())
+        connectionList = doc['net']['connection']
+        for connection in connectionList:
+            G.add_edge(connection['@from'], connection['@to'])
     return G
 
 # def distribute_parked_vehicles(G, percentOfVehiclesToPark):
@@ -65,44 +74,53 @@ def convert_xml_edges_to_networkx():
 #         G.edges[randomEdge]['parked_vehicles_count'] += 1
 
 
-laneDict = {}
-G = convert_xml_edges_to_networkx()
+if __name__ == "__main__":
+    laneDict = get_lane_information_from_xml()
 
-# initialize the edges
-for edge in G.edges(data=True):
-    edge[2]['parking_capacity'] = 0
-    edge[2]['parked_vehicles_count'] = 0
-    edge[2]['moving_vehicles_count'] = 0
-#     edge[2]['pheromone_level'] = 1
-#     edge[2]['selection_probability'] = 0
+    # note that the nodes in the graph are the roads of the road network, it also contains internal roads
+    G = get_graph_from_xml_connections()
 
-updatedAdditionalXml = None
-with open(ADDITIONAL_XML_FILE) as fd:
-    doc = xmltodict.parse(fd.read())
-    parkingAreaList = doc['additional']['parkingArea']
-    for parkingArea in parkingAreaList:
-        parkingArea['@roadsideCapacity'] = '0'
-        edge = laneDict[parkingArea['@lane']]
-        G.edges[edge]['parking_areas'].append(parkingArea)
+    # initialize the edges, only the non internal nodes have parking
+    for node, datadict in G.nodes.items():
+        datadict['is_internal'] = True if node[0] == ':' else False
+        datadict['parked_vehicles_count'] = 0
+        datadict['moving_vehicles_count'] = 0
+        datadict['parking_areas'] = []
+        datadict['parking_capacity'] = 0
+    #     edge[2]['pheromone_level'] = 1
+    #     edge[2]['selection_probability'] = 0
+
+    updatedAdditionalXml = None
+    with open(ADDITIONAL_XML_FILE) as fd:
+        doc = xmltodict.parse(fd.read())
+        parkingAreaList = doc['additional']['parkingArea']
+        for parkingArea in parkingAreaList:
+            parkingArea['@roadsideCapacity'] = '0'
+            edgeID = laneDict[parkingArea['@lane']]['edgeID']
+            length = laneDict[parkingArea['@lane']]['length']
+            G.nodes[edgeID]['parking_areas'].append(parkingArea)
+            G.nodes[edgeID]['length'] = length
 
     distribute_parking_spots(G)
     updatedParkingAreas = []
-    for edge in G.edges():
-        updatedParkingAreas.extend(G.edges[edge]['parking_areas'])
+    for node in G.nodes():
+        updatedParkingAreas.extend(G.nodes[node]['parking_areas'])
     doc['additional']['parkingArea'] = updatedParkingAreas
     updatedAdditionalXml = xmltodict.unparse(doc, pretty=True)
 
+    with open(ADDITIONAL_XML_FILE, 'w') as fd:
+        fd.write(updatedAdditionalXml)
 
-for e, datadict in G.edges.items():
-    for parkingArea in datadict['parking_areas']:
-        datadict['parking_capacity'] += int(parkingArea['@roadsideCapacity'])
+    for n, datadict in G.nodes.items():
+        for parkingArea in datadict['parking_areas']:
+            datadict['parking_capacity'] += int(parkingArea['@roadsideCapacity'])
+        # if not datadict['is_internal']:
+        #     print(n, datadict)
 
-# not needed as alternative logic exists for keeping number of parked vehicles constant
-# distribute_parked_vehicles(G, PERCENT_OF_VEHICLES_TO_PARK)
+    print(random.choice(list(G['gneE0'].keys())))
 
-with open(ADDITIONAL_XML_FILE, 'w') as fd:
-    fd.write(updatedAdditionalXml)
+    # not needed as alternative logic exists for keeping number of parked vehicles constant
+    # distribute_parked_vehicles(G, PERCENT_OF_VEHICLES_TO_PARK)
 
-nx.write_gpickle(G, GRAPH_PICKLED_FILE_SAVE_LOCATION)
-
-set_on_road_parking(1)
+    nx.write_gpickle(G, GRAPH_PICKLED_FILE_SAVE_LOCATION)
+    # set_on_road_parking(1)
