@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on Tuesday 11 June 2019 01:25:19 AM IST by Eclipse SUMO netedit Version 1.2.0
+<!-- generated on Tuesday 11 June 2019 04:16:49 PM IST by Eclipse SUMO netedit Version 1.2.0
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
 
     <input>
-        <sumo-net-file value="/home/tara/codes/aco/sumo/aco.net.xml"/>
+        <sumo-net-file value="/home/tara/codes/aco/network/aco.net.xml"/>
     </input>
 
     <output>
-        <output-file value="/home/tara/codes/aco/sumo/aco.net.xml"/>
+        <output-file value="/home/tara/codes/aco/network/aco.net.xml"/>
     </output>
 
     <processing>
@@ -27,10 +27,6 @@
     <pedestrian>
         <walkingareas value="false"/>
     </pedestrian>
-
-    <netedit>
-        <additional-files value="/home/tara/codes/aco/sumo/aco.add.xml"/>
-    </netedit>
 
 </configuration>
 -->

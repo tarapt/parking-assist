@@ -22,7 +22,6 @@ def distribute_parking_spots(G):
 
 def get_lane_information_from_xml():
     laneDict = {}
-    edgeDict = {}
     with open(NETWORK_XML_FILE) as fd:
         doc = xmltodict.parse(fd.read())
         edgeList = doc['net']['edge']
@@ -37,11 +36,7 @@ def get_lane_information_from_xml():
                     length = edge['lane']['@length']
                 for lane in lanes:
                     laneDict[lane] = {'edgeID': edge['@id'], 'length': length}
-                    if edgeDict.get(edge['@id']) is None:
-                        edgeDict[edge['@id']] = {'lanes': [lane]}
-                    else:
-                        edgeDict[edge['@id']]['lanes'].append(lane)
-    return laneDict, edgeDict
+    return laneDict
 
 
 # note that the nodes in the graph are the lanes of the road network, it also contains internal lanes
@@ -70,23 +65,17 @@ def update_additional_xml(G):
             fd.write(updatedAdditionalXml)
 
 
-def add_parking_areas_to_lanes(G, onRoadValue=True):
+# having onRoad=True will block one of the lanes preventing some vehicle to switch lanes
+def add_parking_areas_to_lanes(G, laneDict, onRoadValue=False):
     with open(ADDITIONAL_XML_FILE) as fd:
         doc = xmltodict.parse(fd.read())
         parkingAreaList = doc['additional']['parkingArea']
         for parkingArea in parkingAreaList:
-            parkingArea['@roadsideCapacity'] = '0'
-            parkingArea['@onRoad'] = str(int(onRoadValue))
+            parkingArea['@roadsideCapacity'] = str(int(onRoadValue))
+            parkingArea['@onRoad'] = onRoadValue
             laneID = parkingArea['@lane']
             G.nodes[laneID]['parking_areas'].append(parkingArea)
             G.nodes[laneID]['length'] = laneDict[laneID]['length']
-
-
-def calculate_total_parking_capacity(G):
-    for laneID, datadict in G.nodes.items():
-        if datadict.get('parking_areas'):
-            for parkingArea in datadict['parking_areas']:
-                datadict['parking_capacity'] += int(parkingArea['@roadsideCapacity'])
 
 
 '''
@@ -106,16 +95,12 @@ def distribute_parked_vehicles(G, percentOfVehiclesToPark):
 # initialize the edges, only the non internal nodes have parking
 
 
-def initialize_nodes():
+def initialize_nodes(laneDict):
     for laneID, datadict in G.nodes.items():
         datadict['is_internal'] = True if laneID[0] == ':' else False
         if not datadict['is_internal']:
-            datadict['parked_vehicles_count'] = 0
-            datadict['moving_vehicles_count'] = 0
             datadict['parking_areas'] = []
-            datadict['parking_capacity'] = 0
             datadict['parent_edge'] = laneDict[laneID]['edgeID']
-            # datadict['pheromone_level'] = 1
 
 
 def print_graph(G, exclude_internal_nodes=False):
@@ -128,12 +113,11 @@ def print_graph(G, exclude_internal_nodes=False):
 
 
 if __name__ == "__main__":
-    laneDict, edgeDict = get_lane_information_from_xml()
+    laneDict = get_lane_information_from_xml()
     G = get_graph_from_xml_connections()
-    initialize_nodes()
-    add_parking_areas_to_lanes(G)
+    initialize_nodes(laneDict)
+    add_parking_areas_to_lanes(G, laneDict)
     distribute_parking_spots(G)
     update_additional_xml(G)
-    calculate_total_parking_capacity(G)
     # print_graph(G)
     nx.write_gpickle(G, GRAPH_PICKLED_FILE_SAVE_LOCATION)
