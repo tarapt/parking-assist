@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on Tue 11 Jun 2019 03:01:33 IST by Eclipse SUMO GUI Version 1.2.0
+<!-- generated on Tue 11 Jun 2019 12:20:29 IST by Eclipse SUMO GUI Version 1.2.0
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
 
     <input>
-        <net-file value="sumo/aco.net.xml"/>
-        <route-files value="sumo/aco.rou.xml"/>
-        <additional-files value="sumo/aco.add.xml"/>
+        <net-file value="network/aco.net.xml"/>
+        <route-files value="network/aco.rou.xml"/>
+        <additional-files value="network/aco.add.xml"/>
     </input>
 
     <output>
@@ -14,7 +14,7 @@
     </output>
 
     <traci_server>
-        <remote-port value="54537"/>
+        <remote-port value="53725"/>
     </traci_server>
 
 </configuration>

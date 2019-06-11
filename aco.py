@@ -8,7 +8,9 @@ import logging
 logging.basicConfig(
     format='%(levelname)s: %(message)s',
     level=logging.DEBUG,
-    filename='output/traci.log')
+    filename='output/traci.log',
+    filemode='w'
+)
 
 # we need to import some python modules from the $SUMO_HOME/tools directory
 if 'SUMO_HOME' in os.environ:
@@ -21,7 +23,7 @@ else:
 from sumolib import checkBinary  # Checks for the binary in environ vars
 import traci
 
-GRAPH_PICKLED_FILE_LOCATION = 'graph/graph.gpickle'
+GRAPH_PICKLED_FILE_LOCATION = 'network/graph.gpickle'
 PARKING_NEED_PROBABILITY = 1
 # random.seed(0)
 
@@ -60,16 +62,15 @@ def run(max_steps=500):
         traci.simulationStep()
         print("Simulation Step: {}".format(step))
 
-        # traci.edge.getIDList() returns info about lanes also, so access from the graph object
-        for node, datadict in G.nodes.items():
-            datadict['moving_vehicles_count'] = traci.edge.getLastStepVehicleNumber(node)
+        for laneID, datadict in G.nodes.items():
+            datadict['moving_vehicles_count'] = traci.lane.getLastStepVehicleNumber(laneID)
 
         for vehID in traci.vehicle.getIDList():
-            currentRoadID = traci.vehicle.getRoadID(vehID)
-            if currentRoadID in G and not G.nodes[currentRoadID]['is_internal']:
-                nextRoadID = random.choice(list(G[currentRoadID].keys()))
-                logging.debug("{} {} {} {}".format(step, vehID, currentRoadID, nextRoadID))
-                traci.vehicle.setRoute(vehID, [currentRoadID, nextRoadID])
+            currentLaneID = traci.vehicle.getLaneID(vehID)
+            if currentLaneID in G and not G.nodes[currentLaneID]['is_internal']:
+                nextLaneID = random.choice(list(G[currentLaneID].keys()))
+                logging.debug("{} {} {} {}".format(step, vehID, currentLaneID, nextLaneID))
+                traci.vehicle.setRoute(vehID, [G.nodes[currentLaneID]['parent_edge'], G.nodes[nextLaneID]['parent_edge']])
 
             # if vehicleTravelInfo.get(vehID) is None:
             #     vehicleTravelInfo[vehID] = {'start_distance_reading': 0, 'finish_distance_reading': None, 'overall_route': traci.vehicle.getRoute(vehID), 'start_route_id': 0, 'finish_route_id': None}
@@ -110,8 +111,9 @@ def run(max_steps=500):
 
 def getTotalParkingSpots():
     sum = 0
-    for node, datadict in G.nodes.items():
-        sum += datadict['parking_capacity']
+    for laneID, datadict in G.nodes.items():
+        if datadict.get('parking_capacity'):
+            sum += datadict['parking_capacity']
     return sum
 
 
@@ -129,6 +131,6 @@ if __name__ == "__main__":
     totalParkingSpots = getTotalParkingSpots()
 
     # traci starts sumo as a subprocess and then this script connects and runs
-    traci.start([sumoBinary, "-c", "sumo/aco.sumocfg",
+    traci.start([sumoBinary, "-c", "network/aco.sumocfg",
                              "--tripinfo-output", "output/tripinfo.xml"])
     run()
