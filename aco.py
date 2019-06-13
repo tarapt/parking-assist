@@ -25,9 +25,19 @@ else:
 from sumolib import checkBinary  # Checks for the binary in environ vars
 import traci
 
+from network.config import TOTAL_VEHICLES, TOTAL_PARKING_SPOTS
 GRAPH_PICKLED_FILE_LOCATION = 'network/graph.gpickle'
 PARKING_NEED_PROBABILITY = 0.5
-# random.seed(0)
+# TOTAL_CARS_IN_THE_NETWORK = TOTAL_VEHICLES
+TOTAL_CARS_IN_THE_NETWORK = 2
+# TOTAL_CARS_PARKED_TARGET should atmost be TOTAL_PARKING_SPOTS - 1
+# TOTAL_CARS_PARKED_TARGET = int(TOTAL_PARKING_SPOTS / 8)
+TOTAL_CARS_PARKED_TARGET = 1
+parkedVehicles = set()
+
+PHEROMONE_CONTRIBUTION_COEFFICIENT = 10
+PHEROMONE_DECAY_COEFFICIENT = 0.9
+COOLDOWN_PERIOD_AFTER_RELEASED_FROM_PARKING = 50  # in time steps
 
 
 def get_options():
@@ -57,55 +67,57 @@ def get_options():
 vehicleTravelInfo = {}
 
 
-def calculate_probability_to_get_free_parking(edgeInfo):
-    edgeParkingProbability = {}
-    for edgeID, info in edgeInfo.items():
-        k = info['available_parking_spaces'] - 1
-        n = info['moving_vehicles_count']
-        p = PARKING_NEED_PROBABILITY
-        edgeParkingProbability[edgeID] = bdtr(k, n, p)
+def calculate_probability_to_get_free_parking(edgeID, availableParkingSpaces, movingVehiclesCount):
+    if availableParkingSpaces == 0:
+        return 0
+    if availableParkingSpaces > movingVehiclesCount:
+        return 1
+    k = availableParkingSpaces - 1
+    n = movingVehiclesCount
+    p = PARKING_NEED_PROBABILITY
+    edgeParkingProbability = bdtr(k, n, p)
     return edgeParkingProbability
 
 
-def get_edge_information(G):
+def random_routing_from_lane_neighbors(vehID, step):
+    currentLaneID = traci.vehicle.getLaneID(vehID)
+    if currentLaneID in G and not G.nodes[currentLaneID]['is_internal']:
+        nextLaneID = random.choice(list(G[currentLaneID].keys()))
+        logging.debug("{} {} {} {}".format(
+            step, vehID, currentLaneID, nextLaneID))
+        traci.vehicle.setRoute(
+            vehID, [G.nodes[currentLaneID]['parent_edge'], G.nodes[nextLaneID]['parent_edge']])
+
+
+def random_routing_from_edge_neighbors(vehID, edges, step):
+    currentEdgeID = traci.vehicle.getRoadID(vehID)
+    if edges.get(currentEdgeID):
+        nextEdgeID = random.choice(list(edges[currentEdgeID]['neighbors']))
+        logging.debug("{} {} {} {}".format(
+            step, vehID, currentEdgeID, nextEdgeID))
+        traci.vehicle.setRoute(vehID, [currentEdgeID, nextEdgeID])
+
+
+def get_all_edges(G):
     edgeInfo = {}
     for laneID, datadict in G.nodes.items():
         if not datadict['is_internal']:
             edgeID = datadict['parent_edge']
             if edgeInfo.get(edgeID) is None:
-                edgeInfo[edgeID] = {'pheromone': 1, 'moving_vehicles_count': 0, 'parked_vehicles_count': 0,
-                                    'parking_capacity': 0, 'parking_areas': [], 'lanes': [], 'neighbors': set()}
+                edgeInfo[edgeID] = {'parking_areas': [],
+                                    'lanes': [], 'neighbors': set()}
             edgeInfo[edgeID]['lanes'].append(laneID)
 
             for neighborLane in list(G[laneID].keys()):
                 neighborEdge = G.nodes[neighborLane]['parent_edge']
                 edgeInfo[edgeID]['neighbors'].add(neighborEdge)
 
-            edgeInfo[edgeID]['moving_vehicles_count'] += traci.lane.getLastStepVehicleNumber(laneID)
             for parkingArea in datadict['parking_areas']:
-                edgeInfo[edgeID]['parking_areas'].append(parkingArea['@id'])
-                edgeInfo[edgeID]['parked_vehicles_count'] += int(traci.simulation.getParameter(parkingArea['@id'],
-                                                                                               "parkingArea.occupancy"))
-                # alternatively use parkingArea.capacity
-                edgeInfo[edgeID]['parking_capacity'] += int(parkingArea['@roadsideCapacity'])
-            edgeInfo[edgeID]['available_parking_spaces'] = edgeInfo[edgeID]['parking_capacity'] - edgeInfo[edgeID]['parked_vehicles_count']
+                capacity = int(traci.simulation.getParameter(
+                    parkingArea['@id'], "parkingArea.capacity"))
+                edgeInfo[edgeID]['parking_areas'].append({'id': parkingArea['@id'],
+                                                          'capacity': capacity, 'occupancy': 0})
     return edgeInfo
-
-
-def calculate_turn_probability_from_lane_neighbors(edgeInfo):
-    turnProbability = {}
-    for laneID, laneInfo in G.nodes.items():
-        pheromone = {}
-        pheromoneSum = 0
-        for neighborLane in list(G[laneID].keys()):
-            neighborEdge = G.nodes[neighborLane]['parent_edge']
-            pheromone[neighborLane] = edgeInfo[neighborEdge]['pheromone']
-            pheromoneSum += pheromone[neighborLane]
-
-        turnProbability[laneID] = {}
-        for neighborLane in list(G[laneID].keys()):
-            turnProbability[laneID][neighborLane] = pheromone[neighborLane] / pheromoneSum
-    return turnProbability
 
 
 def calculate_turn_probability_from_edge_neighbors(edgeInfo):
@@ -120,82 +132,157 @@ def calculate_turn_probability_from_edge_neighbors(edgeInfo):
     return turnProbability
 
 
-def pheromone_based_routing(vehID, step, turnProbability):
+def calculate_turn_probability_from_lane_neighbors(laneID, pheromoneLevels):
+    pheromoneSum = 0
+    pheromone = {}
+    for neighborLane in list(G[laneID].keys()):
+        neighborEdge = G.nodes[neighborLane]['parent_edge']
+        pheromone[neighborLane] = pheromoneLevels[neighborEdge]
+        pheromoneSum += pheromone[neighborLane]
+
+    turnProbability = {}
+    for neighborLane in list(G[laneID].keys()):
+        turnProbability[neighborLane] = pheromone[neighborLane] / pheromoneSum
+    return turnProbability
+
+
+def pheromone_based_routing(vehID, step, pheromoneLevels):
     currentLaneID = traci.vehicle.getLaneID(vehID)
-    if currentLaneID in G and not G.nodes[currentLaneID]['is_internal']:
-        neighborLanes = list(G[currentLaneID].keys())
-        probabilities = [0] * len(neighborLanes)
-        for i in range(len(neighborLanes)):
-            neighborLane = neighborLanes[i]
-            probabilities[i] = turnProbability[currentLaneID][neighborLane]
-        nextLaneID = np.random.choice(neighborLanes, p=probabilities)
-        logging.debug("{} {} {} {}".format(step, vehID, currentLaneID, nextLaneID))
-        traci.vehicle.setRoute(vehID, [G.nodes[currentLaneID]['parent_edge'], G.nodes[nextLaneID]['parent_edge']])
+    if G.nodes.get(currentLaneID) and not G.nodes[currentLaneID]['is_internal']:
+        turnProbability = calculate_turn_probability_from_lane_neighbors(currentLaneID, pheromoneLevels)
+        if currentLaneID in G and not G.nodes[currentLaneID]['is_internal']:
+            neighborLanes = list(G[currentLaneID].keys())
+            probabilities = [0] * len(neighborLanes)
+            for i in range(len(neighborLanes)):
+                neighborLane = neighborLanes[i]
+                probabilities[i] = turnProbability[neighborLane]
+            nextLaneID = np.random.choice(neighborLanes, p=probabilities)
+            logging.debug("{} {} {} {}".format(
+                step, vehID, currentLaneID, nextLaneID))
+            traci.vehicle.setRoute(
+                vehID, [G.nodes[currentLaneID]['parent_edge'], G.nodes[nextLaneID]['parent_edge']])
+    else:
+        logging.warning('Vehicle {} is on lane {}.'.format(vehID, currentLaneID))
 
 
-def random_routing_from_lane_neighbors(vehID, step):
-    currentLaneID = traci.vehicle.getLaneID(vehID)
-    if currentLaneID in G and not G.nodes[currentLaneID]['is_internal']:
-        nextLaneID = random.choice(list(G[currentLaneID].keys()))
-        logging.debug("{} {} {} {}".format(step, vehID, currentLaneID, nextLaneID))
-        traci.vehicle.setRoute(vehID, [G.nodes[currentLaneID]['parent_edge'], G.nodes[nextLaneID]['parent_edge']])
-
-
-def random_routing_from_edge_neighbors(vehID, edgeInfo, step):
-    currentEdgeID = traci.vehicle.getRoadID(vehID)
-    if edgeInfo.get(currentEdgeID):
-        nextEdgeID = random.choice(list(edgeInfo[currentEdgeID]['neighbors']))
-        logging.debug("{} {} {} {}".format(step, vehID, currentEdgeID, nextEdgeID))
-        traci.vehicle.setRoute(vehID, [currentEdgeID, nextEdgeID])
+def get_available_parking_spaces(currentEdgeID, edges):
+    availableParkingSpaces = 0
+    for parkingArea in edges[currentEdgeID]['parking_areas']:
+        availableParkingSpaces += parkingArea['capacity'] - \
+            parkingArea['occupancy']
+        logging.info("Parking Area: {}, capacity: {}, occupancy: {}".format(parkingArea['id'],
+                                                                            parkingArea['capacity'], parkingArea['occupancy']))
+    return availableParkingSpaces
 
 
 # contains TraCI control loop
-def run(max_steps=500):
+def run(G, max_steps=500):
     step = 1
+    edges = get_all_edges(G)
+    pheromoneLevels = {}
+    for edgeID in edges:
+        pheromoneLevels[edgeID] = 1
+
+    travelInfo = {}
+
     while traci.simulation.getMinExpectedNumber() > 0 and step < max_steps:
         traci.simulationStep()
+        newPheromones = {}
         print("Simulation Step: {}".format(step))
-
-        edgeInfo = get_edge_information(G)
-        edgeParkingProbability = calculate_probability_to_get_free_parking(edgeInfo)
-        turnProbability = calculate_turn_probability_from_lane_neighbors(edgeInfo)
-
         for vehID in traci.vehicle.getIDList():
-            # random_routing_from_lane_neighbors(vehID, step)
-            # random_routing_from_edge_neighbors(vehID, edgeInfo, step)
-            pheromone_based_routing(vehID, step, turnProbability)
+            if travelInfo.get(vehID) is None:
+                travelInfo[vehID] = {'is_parked': False, 'parking_area_id': None, 'start_distance': 0,
+                                     'finish_distance': None, 'overall_route': traci.vehicle.getRoute(vehID),
+                                     'start_route_id': 0, 'finish_route_id': None}
+            if travelInfo[vehID]['is_parked'] is True:
+                continue
+            currentEdgeID = traci.vehicle.getRoadID(vehID)
+            if edges.get(currentEdgeID):
+                # random_routing_from_lane_neighbors(vehID, step)
+                pheromone_based_routing(vehID, step, pheromoneLevels)
+                parkingNeedToss = random.random()
+                logging.info("VehID: {}, EdgeID: {}, PARKING_NEED: {}, parkingNeedToss: {}".format(vehID, edgeID,
+                                                                                                   PARKING_NEED_PROBABILITY,
+                                                                                                   parkingNeedToss))
+                if parkingNeedToss < PARKING_NEED_PROBABILITY:
+                    movingVehiclesCount = traci.edge.getLastStepVehicleNumber(
+                        currentEdgeID)
+                    availableParkingSpaces = get_available_parking_spaces(
+                        currentEdgeID, edges)
+                    edgeParkingProbability = calculate_probability_to_get_free_parking(currentEdgeID,
+                                                                                       availableParkingSpaces,
+                                                                                       movingVehiclesCount)
+                    parkingTossValue = random.random()
+                    logging.info("VehID: {}, EdgeID: {}, parkingGurantee: {}, parkingTossValue: {}".format(
+                        vehID, edgeID, edgeParkingProbability, parkingTossValue))
+                    if parkingTossValue < edgeParkingProbability:
+                        # try to park the car on some parking area on this edge
+                        for parkingArea in edges[currentEdgeID]['parking_areas']:
+                            # logging.info("Parking Area: {}, capacity: {}, occupancy: {}".format(parkingArea['id'], parkingArea['capacity'], occupancy))
+                            if parkingArea['occupancy'] < parkingArea['capacity']:
+                                try:
+                                    traci.vehicle.setParkingAreaStop(vehID, parkingArea['id'], duration=100000)
+                                except traci.exceptions.TraCIException as e:
+                                    logging.warning(e)
+                                except Exception as e:
+                                    logging.error(e)
+                                else:
+                                    # Problem: We should only execute the below steps if we are sure that the car has parked.
+                                    # If some error occurs and the car doesn't get parked it will stay still as we don't search
+                                    # for parking areas nor route the vehicles which are parked
+                                    # maybe routing parked vehicles also could solve that problem but marking start and finish
+                                    # values for a car which isn't actually parked, and the parkedVehicles set is used to remove
+                                    # a car. So, check for isStoppedParking() value before executing these steps. And execute this 
+                                    # code every iteration if the vehicle is scheduled to park. And once executed remove the vehicle
+                                    # from the scheduled vehicles to park.
+                                    travelInfo[vehID]['is_parked'] = True
+                                    travelInfo[vehID]['parking_area_id'] = parkingArea['id']
+                                    parkingArea['occupancy'] += 1
+                                    parkedVehicles.add(vehID)
+                                    # note down the distance reading
+                                    travelInfo[vehID]['finish_distance'] = traci.vehicle.getDistance(vehID)
+                                    pathLength = travelInfo[vehID]['finish_distance'] - travelInfo[vehID]['start_distance']
 
-        # if vehicleTravelInfo.get(vehID) is None:
-        #     vehicleTravelInfo[vehID] = {'start_distance_reading': 0, 'finish_distance_reading': None, 'overall_route': traci.vehicle.getRoute(vehID), 'start_route_id': 0, 'finish_route_id': None}
-        # if random.random() < PARKING_NEED_PROBABILITY:
-        #     currentEdgeID = traci.vehicle.getRoadID(vehID)
+                                    # get the edges travelled by the vehicle since it last got parked
+                                    vehRoute = traci.vehicle.getRoute(vehID)
+                                    currentIndexOnRoute = traci.vehicle.getRouteIndex(vehID)
+                                    travelInfo[vehID]['finish_route_id'] = currentIndexOnRoute
+                                    # add pheromones on the travelled path
+                                    logging.info("VehID: {} startDistance: {} finishDistance: {}".format(vehID, travelInfo[vehID]['start_distance'], travelInfo[vehID]['finish_distance']))
+                                    if pathLength == 0:
+                                        # TODO if a vehicle is released from parking, 
+                                        # make it wait for sometime, before it starts looking for parking
+                                        # otherwise it would choose the same parking lot, resulting in 0 or very small 
+                                        # path lengths which would give weird pheromone values
+                                        pathLength = 1
+                                    for i in range(travelInfo[vehID]['start_route_id'], travelInfo[vehID]['finish_route_id'] + 1):
+                                        edgeID = vehRoute[i]
+                                        if newPheromones.get(edgeID) is None:
+                                            newPheromones[edgeID] = 1.0 / pathLength
+                                        else:
+                                            newPheromones[edgeID] += 1.0 / pathLength
 
-        #     # the vehicle may be on a junction or an edge
-        #     if edgeDict.get(currentEdgeID):
-        #         currentEdge = edgeDict[currentEdgeID]
-        #         availableParkingSpots = getAvailableParkingSpots(currentEdge)
-        #         if availableParkingSpots > 0:
-        #             # park the vehicle here
-        #             # traci.vehicle.setParkingAreaStop(vehID, 'parkingArea_gneE0_0_1', duration=100000)
-        #             vehicleTravelInfo[vehID]['finish_distance_reading'] = traci.vehicle.getDistance(vehID)
-        #             print("Vehicle {} covered {} distance before parking.".format(vehID, vehicleTravelInfo[vehID]['finish_distance_reading'] - vehicleTravelInfo[vehID]['start_distance_reading']))
-        #             vehRoute = traci.vehicle.getRoute(vehID)
-        #             vehRouteIndex = vehRoute[traci.vehicle.getRouteIndex(vehID)]
-        #             print("Route: {}".format(vehRoute))
-        #             print("Vehicle is at index {}, which is edge {} on this route.".format(vehRouteIndex, vehRoute[vehRouteIndex]))
-        #             incrementParkedCount(currentEdge)
-
-        #             # randomly choose an edge which has some vehicle parked in it and remove a vehicle from it
-        #             candidateList = []
-        #             for edgeID, edge in edgeDict.items():
-        #                 if edgeID != currentEdgeID and getParkedVehcilesCount(edge) > 0:
-        #                     candidateList.append(edge)
-        #             randomEdge = random.choice(candidateList)
-        #             decrementParkedCount(randomEdge)
-
-        #             # spawn a new vehicle here, so that moving_vehicles_count doesn't change, update the distance readings
-        #             vehicleTravelInfo[vehID]['start_distance_reading'] = vehicleTravelInfo[vehID]['finish_distance_reading']
-        #             vehicleTravelInfo[vehID]['finish_distance_reading'] = None
+                                    if len(parkedVehicles) == TOTAL_CARS_PARKED_TARGET:
+                                        # remove a parked car before adding one
+                                        vehIDToRemove = random.choice(list(parkedVehicles))
+                                        try:
+                                            traci.vehicle.setParkingAreaStop(vehIDToRemove, travelInfo[vehIDToRemove]['parking_area_id'], duration=0)
+                                        except traci.exceptions.TraCIException as e:
+                                            logging.warning(e)
+                                        except Exception as e:
+                                            logging.error(e)
+                                        else:
+                                            parkedVehicles.remove(vehIDToRemove)
+                                            travelInfo[vehIDToRemove]['is_parked'] = False
+                                            travelInfo[vehIDToRemove]['parking_area_id'] = None
+                                            travelInfo[vehIDToRemove]['start_distance'] = travelInfo[vehIDToRemove]['finish_distance']
+                                            travelInfo[vehIDToRemove]['finish_distance'] = None
+                                            travelInfo[vehIDToRemove]['start_route_id'] = traci.vehicle.getRouteIndex(vehIDToRemove)
+                                            travelInfo[vehIDToRemove]['finish_route_id'] = None
+                                    break
+        for edgeID, pheromoneLevel in newPheromones.items():
+            pheromoneLevels[edgeID] = PHEROMONE_DECAY_COEFFICIENT * pheromoneLevels[edgeID]
+            pheromoneLevels[edgeID] += PHEROMONE_CONTRIBUTION_COEFFICIENT * pheromoneLevel
         step += 1
 
     traci.close()
@@ -219,11 +306,10 @@ if __name__ == "__main__":
     else:
         sumoBinary = checkBinary('sumo-gui')
 
-    global G
     G = nx.read_gpickle(GRAPH_PICKLED_FILE_LOCATION)
     totalParkingSpots = getTotalParkingSpots()
 
     # traci starts sumo as a subprocess and then this script connects and runs
     traci.start([sumoBinary, "-c", "network/aco.sumocfg",
                              "--tripinfo-output", "output/tripinfo.xml"])
-    run(max_steps=1000)
+    run(G, max_steps=10000)

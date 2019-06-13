@@ -4,7 +4,8 @@
 
     <input>
         <net-file value="aco.net.xml"/>
-        <route-files value="aco.rou.xml"/>
+        <!-- <route-files value="aco.flow_routes.xml"/> -->
+        <route-files value="aco.custom_routes.xml"/>
         <additional-files value="aco.add.xml"/>
     </input>
 

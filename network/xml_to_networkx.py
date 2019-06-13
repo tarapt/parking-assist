@@ -1,21 +1,28 @@
 import networkx as nx
+import numpy as np
 import random
 import xmltodict
 
+from config import TOTAL_PARKING_SPOTS
 NETWORK_XML_FILE = 'aco.net.xml'
+ORIGINAL_ADDITIONAL_XML_FILE = 'aco.original_add.xml'
 ADDITIONAL_XML_FILE = 'aco.add.xml'
 GRAPH_PICKLED_FILE_SAVE_LOCATION = 'graph.gpickle'
-
-random.seed(0)
-TOTAL_PARKING_SPOTS = 500
-PERCENT_OF_VEHICLES_TO_PARK = 30
 
 
 def distribute_parking_spots(G):
     # select an edge randomly from those edges which have a parking area
-    laneList = [n for n in G.nodes() if G.nodes[n].get('parking_areas') and len(G.nodes[n]['parking_areas']) > 0]
+    laneList = []
+    lengths = []
+    for laneID, datadict in G.nodes.items():
+        if datadict.get('parking_areas') and len(datadict['parking_areas']) > 0:
+            lengths.append(datadict['length'])
+            laneList.append(laneID)
+    lengths = np.array(lengths, dtype=np.float)
+    probabilities = lengths / np.sum(lengths)
+
     for i in range(TOTAL_PARKING_SPOTS):
-        randomLane = random.choice(laneList)
+        randomLane = np.random.choice(laneList, p=probabilities)
         randomParkingArea = random.choice(G.nodes[randomLane]['parking_areas'])
         randomParkingArea['@roadsideCapacity'] = str(int(randomParkingArea['@roadsideCapacity']) + 1)
 
@@ -35,7 +42,7 @@ def get_lane_information_from_xml():
                     lanes = [edge['lane']['@id']]
                     length = edge['lane']['@length']
                 for lane in lanes:
-                    laneDict[lane] = {'edgeID': edge['@id'], 'length': length}
+                    laneDict[lane] = {'edgeID': edge['@id'], 'length': float(length)}
     return laneDict
 
 
@@ -52,7 +59,7 @@ def get_graph_from_xml_connections():
 
 def update_additional_xml(G):
     updatedAdditionalXml = None
-    with open(ADDITIONAL_XML_FILE) as fd:
+    with open(ORIGINAL_ADDITIONAL_XML_FILE) as fd:
         doc = xmltodict.parse(fd.read())
         updatedParkingAreas = []
         for lane in G.nodes():
@@ -67,12 +74,17 @@ def update_additional_xml(G):
 
 # having onRoad=True will block one of the lanes preventing some vehicle to switch lanes
 def add_parking_areas_to_lanes(G, laneDict, onRoadValue=False):
-    with open(ADDITIONAL_XML_FILE) as fd:
+    with open(ORIGINAL_ADDITIONAL_XML_FILE) as fd:
         doc = xmltodict.parse(fd.read())
         parkingAreaList = doc['additional']['parkingArea']
         for parkingArea in parkingAreaList:
             parkingArea['@roadsideCapacity'] = str(int(onRoadValue))
             parkingArea['@onRoad'] = onRoadValue
+            if float(parkingArea['@endPos']) > 200:
+                parkingArea['@length'] = '80'
+            else:
+                parkingArea['@length'] = '40'
+            parkingArea['@startPos'] = str(round(float(parkingArea['@endPos']) - float(parkingArea['@length']), 2))
             laneID = parkingArea['@lane']
             G.nodes[laneID]['parking_areas'].append(parkingArea)
             G.nodes[laneID]['length'] = laneDict[laneID]['length']

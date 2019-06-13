@@ -1,1 +1,5 @@
+.vscode/
+network/__pycache__/
 output/
+*.log
+network/graph.gpickle
