@@ -1,5 +1,6 @@
 .vscode/
-network/__pycache__/
-output/
+src/__pycache__/
+src/aco.add.xml
+output/tripinfo.xml
 *.log
-network/graph.gpickle
+src/graph.gpickle
