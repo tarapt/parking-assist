@@ -1,4 +1,5 @@
 .vscode/
+*.pyc
 src/__pycache__/
 src/aco.add.xml
 output/tripinfo.xml

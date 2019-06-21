@@ -207,11 +207,6 @@ class TraciClient():
             except Exception as e:
                 logging.error(e)
             else:
-                logging.info('Vehicle {} has been unparked from {}.'.format(vehIDToRemove, self.travelInfo[vehIDToRemove]['parked_area']['id']))
-                self.travelInfo[vehIDToRemove]['vehicle_state'] = VehicleState.PARKING_NOT_NEEDED
-                self.parkedVehicles.remove(vehIDToRemove)
-                self.travelInfo[vehIDToRemove]['parked_area']['occupancy'] -= 1
-                self.travelInfo[vehIDToRemove]['parked_area'] = None
                 temp = []
                 for vehID, data in self.travelInfo.items():
                     if data['vehicle_state'] == VehicleState.PARKING_NOT_NEEDED:
@@ -219,6 +214,12 @@ class TraciClient():
                 newVehicleID = random.choice(temp)
                 self.travelInfo[newVehicleID]['vehicle_state'] = VehicleState.SEARCHING_PARKING_AREA
                 self.update_start_metrics(newVehicleID)
+
+                self.travelInfo[vehIDToRemove]['vehicle_state'] = VehicleState.PARKING_NOT_NEEDED
+                self.parkedVehicles.remove(vehIDToRemove)
+                self.travelInfo[vehIDToRemove]['parked_area']['occupancy'] -= 1
+                logging.info('Vehicle {} has been unparked from {}.'.format(vehIDToRemove, self.travelInfo[vehIDToRemove]['parked_area']['id']))
+                self.travelInfo[vehIDToRemove]['parked_area'] = None
 
     def addPheromonesToTheLastPath(self, vehID, newPheromones):
         # get the edges travelled by the vehicle since it last got parked
@@ -322,7 +323,7 @@ class TraciClient():
                 self.random_routing_from_edge_neighbors(vehID)
                 currentEdgeID = self.traciConnection.vehicle.getRoadID(vehID)
                 if self.edges.get(currentEdgeID) is not None:
-                    self.init_period_vsm(vehID, currentEdgeID)
+                    self.init_period_fsm(vehID, currentEdgeID)
             step += 1
         logging.info("Simulation Step: {}, Parked Vehicles: {}".format(step, len(self.parkedVehicles)))
         logging.info('Initial set of vehicles have been parked in the network.')
@@ -364,7 +365,7 @@ class TraciClient():
                 logging.debug('Vehicle {}: {}, distance={}'.format(vehID, self.travelInfo[vehID]['vehicle_state'].name, self.travelInfo[vehID]['distance_travelled']))
                 currentEdgeID = self.traciConnection.vehicle.getRoadID(vehID)
                 if self.edges.get(currentEdgeID) is not None:
-                    self.vsm(vehID, currentEdgeID, newPheromones)
+                    self.fsm(vehID, currentEdgeID, newPheromones)
 
             self.updatePheromoneLevels(newPheromones)
             step += 1
@@ -376,18 +377,20 @@ class TraciClient():
         if d > self.travelInfo[vehID]['distance_travelled']:
             self.travelInfo[vehID]['distance_travelled'] = d
 
-    # vehicle state machine during the initialization period
-    def init_period_vsm(self, vehID, currentEdgeID):
-        if self.travelInfo[vehID]['vehicle_state'] == VehicleState.PARKED:
-            return
-        elif self.travelInfo[vehID]['vehicle_state'] == VehicleState.SEARCHING_PARKING_AREA:
+    # vehicle finite state machine during the initialization period
+    def init_period_fsm(self, vehID, currentEdgeID):
+        currentState = self.travelInfo[vehID]['vehicle_state']
+        nextState = currentState
+        if currentState == VehicleState.PARKED:
+            pass
+        elif currentState == VehicleState.SEARCHING_PARKING_AREA:
             if len(self.parkedVehicles) < self.totalVehiclesToPark:
                 if self.try_to_schedule_a_parking(currentEdgeID, vehID):
-                    self.travelInfo[vehID]['vehicle_state'] = VehicleState.SCHEDULED_TO_PARK
-        elif self.travelInfo[vehID]['vehicle_state'] == VehicleState.SCHEDULED_TO_PARK:
+                    nextState = VehicleState.SCHEDULED_TO_PARK
+        elif currentState == VehicleState.SCHEDULED_TO_PARK:
             if self.traciConnection.vehicle.isStoppedParking(vehID):
                 logging.info("Vehicle {} which was scheduled to park has stopped at {}.".format(vehID, self.travelInfo[vehID]['scheduled_parking_area']['id']))
-                self.travelInfo[vehID]['vehicle_state'] = VehicleState.PARKED
+                nextState = VehicleState.PARKED
                 self.markVehicleAsParked(vehID)
             else:
                 self.travelInfo[vehID]['cooldown_counter'] += 1
@@ -395,19 +398,22 @@ class TraciClient():
                 # indicating a failure during parking
                 if self.travelInfo[vehID]['cooldown_counter'] == self.cooldownAfterScheduled:
                     logging.info('Cooldown period of vehicle {} after getting scheduled has ended.'.format(vehID))
-                    self.travelInfo[vehID]['vehicle_state'] = VehicleState.SEARCHING_PARKING_AREA
+                    nextState = VehicleState.SEARCHING_PARKING_AREA
                     self.travelInfo[vehID]['cooldown_counter'] = 0
                     # unreserve the parking area
                     self.travelInfo[vehID]['scheduled_parking_area']['occupancy'] -= 1
+        self.travelInfo[vehID]['vehicle_state'] = nextState
 
-    # vehicle state machine
-    def vsm(self, vehID, currentEdgeID, newPheromones):
-        if self.travelInfo[vehID]['vehicle_state'] == VehicleState.PARKED:
-            return
-        if self.travelInfo[vehID]['vehicle_state'] == VehicleState.SCHEDULED_TO_PARK:
+    # vehicle's finite state machine
+    def fsm(self, vehID, currentEdgeID, newPheromones):
+        currentState = self.travelInfo[vehID]['vehicle_state']
+        nextState = currentState
+        if currentState == VehicleState.PARKED:
+            pass
+        elif currentState == VehicleState.SCHEDULED_TO_PARK:
             if self.traciConnection.vehicle.isStoppedParking(vehID):
                 logging.info("Vehicle {} which was scheduled to park has stopped at {}.".format(vehID, self.travelInfo[vehID]['scheduled_parking_area']['id']))
-                self.travelInfo[vehID]['vehicle_state'] = VehicleState.PARKED
+                nextState = VehicleState.PARKED
                 self.markVehicleAsParked(vehID)
                 self.update_finish_metrics(vehID)
                 self.addPheromonesToTheLastPath(vehID, newPheromones)
@@ -420,14 +426,14 @@ class TraciClient():
                 # if the vehicle has waited for the max allowed time and has still not been parked
                 if self.travelInfo[vehID]['cooldown_counter'] == self.cooldownAfterScheduled:
                     logging.info('Cooldown period of vehicle {} after getting scheduled has ended.'.format(vehID))
-                    self.travelInfo[vehID]['vehicle_state'] = VehicleState.SEARCHING_PARKING_AREA
+                    nextState = VehicleState.SEARCHING_PARKING_AREA
                     self.travelInfo[vehID]['cooldown_counter'] = 0
                     # unreserve the parking area
                     self.travelInfo[vehID]['scheduled_parking_area']['occupancy'] -= 1
-
-        if self.travelInfo[vehID]['vehicle_state'] == VehicleState.SEARCHING_PARKING_AREA:
+        elif currentState == VehicleState.SEARCHING_PARKING_AREA:
             if self.try_to_schedule_a_parking(currentEdgeID, vehID):
-                self.travelInfo[vehID]['vehicle_state'] = VehicleState.SCHEDULED_TO_PARK
+                nextState = VehicleState.SCHEDULED_TO_PARK
+        self.travelInfo[vehID]['vehicle_state'] = nextState
 
     # contains TraCI control loop
     def run(self):

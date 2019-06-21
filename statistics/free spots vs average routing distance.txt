@@ -1,0 +1,31 @@
+INFO: TOTAL_PARKING_SPOTS: 50, TOTAL_VEHICLES_TO_LOAD: 130, TOTAL_VEHICLES_LOOKING_TO_PARK: 65.0
+------------------------------------------------------------------------------------------------
+Free Parking Spaces: 10
+INFO: Total Routing Distance: 1368990.7888809359, Total Trips: 174
+INFO: Average Routing Distance: 7867.763154488137
+
+Free Parking Spaces: 20
+INFO: Total Routing Distance: 2796393.364062087, Total Trips: 387
+INFO: Average Routing Distance: 7225.822646155264
+
+Free Parking Spaces: 30
+INFO: Total Routing Distance: 5486695.112256287, Total Trips: 805
+INFO: Average Routing Distance: 6815.770325784207
+INFO: Total Routing Distance: 3116241.5816963795, Total Trips: 483
+INFO: Average Routing Distance: 6451.845924837225
+
+Free Parking Spaces: 40
+INFO: Total Routing Distance: 5038751.120278634, Total Trips: 771
+INFO: Average Routing Distance: 6535.345162488501
+INFO: Total Routing Distance: 5455501.528393099, Total Trips: 827
+INFO: Average Routing Distance: 6596.737035541837
+INFO: Total Routing Distance: 3116241.5816963795, Total Trips: 483
+INFO: Average Routing Distance: 6451.845924837225
+
+
+Free Parking Spaces: 50
+INFO: Total Routing Distance: 7154795.02825152, Total Trips: 1101
+INFO: Average Routing Distance: 6498.451433470954
+INFO: Total Routing Distance: 6836881.474622445, Total Trips: 1144
+INFO: Average Routing Distance: 5976.29499529934
+

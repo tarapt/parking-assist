@@ -84,7 +84,7 @@ class NetworkGenerator:
             doc = xmltodict.parse(fd.read())
             parkingAreaList = doc['additional']['parkingArea']
             for parkingArea in parkingAreaList:
-                parkingArea['@roadsideCapacity'] = str(int(onRoadValue))
+                parkingArea['@roadsideCapacity'] = 0
                 parkingArea['@onRoad'] = onRoadValue
                 if float(parkingArea['@endPos']) > 200:
                     parkingArea['@length'] = '80'
