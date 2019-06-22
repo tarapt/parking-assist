@@ -32,8 +32,8 @@ def run_experiment():
         logging.critical('percentWithSmart: {}'.format(percentWithSmart))
         client1 = TraciClient(str(percentWithSmart), sumoBinary, totalParkingSpots=totalParkingSpots,
                               totalVehiclesToPark=20, parking_need_probability=0.5,
-                              phereomone_contribution_coefficient=1, phereomone_decay_coefficient=0.01,
-                              cooldown_after_scheduled=30, max_steps=100,
+                              phereomone_contribution_coefficient=200, phereomone_decay_coefficient=0.999,
+                              cooldown_after_scheduled=30, max_steps=1000,
                               totalVehiclesToLoad=TOTAL_VEHICLES_TO_LOAD,
                               percentToRandomRoute=100 - percentWithSmart)
         result = client1.run()
@@ -44,7 +44,7 @@ def run_experiment():
     return results
 
 
-def plot_results():
+def plot_results(results):
     percentWithSmarts = []
     meanRoutingDistances = []
     meanRoutingDistancesForSmart = []
@@ -86,32 +86,32 @@ def plot_results():
 
 if __name__ == "__main__":
     sumoBinary = checkBinary('sumo')
-    # results = run_experiment()
+    results = run_experiment()
 
-    results = [{'result': {'averageRoutingDistance': 485.379537123818, 'averageRoutingTime': 33.770833333333336,
-                           'averageRoutingDistanceForRandom': 485.379537123818, 'averageRoutingTimeForSmart': 0.0,
-                           'averageRoutingDistanceForSmart': 0.0, 'averageRoutingTimeForRandom': 33.770833333333336},
-                'percentWithSmart': 0},
-               {'result': {'averageRoutingDistance': 450.7345417276763, 'averageRoutingTime': 41.83479532163743,
-                           'averageRoutingDistanceForRandom': 490.7345417276763, 'averageRoutingTimeForSmart': 0.0,
-                           'averageRoutingDistanceForSmart': 307.234235232523, 'averageRoutingTimeForRandom': 41.83479532163743},
-                'percentWithSmart': 20},
-               {'result': {'averageRoutingDistance': 433.53216305175144, 'averageRoutingTime': 35.63707865168539,
-                           'averageRoutingDistanceForRandom': 484.53216305175144, 'averageRoutingTimeForSmart': 0.0,
-                           'averageRoutingDistanceForSmart': 323.325235235325, 'averageRoutingTimeForRandom': 35.63707865168539},
-                'percentWithSmart': 40},
-               {'result': {'averageRoutingDistance': 411.80687638269833, 'averageRoutingTime': 39.174157303370784,
-                           'averageRoutingDistanceForRandom': 489.80687638269833, 'averageRoutingTimeForSmart': 0.0,
-                           'averageRoutingDistanceForSmart': 342.2535353266623, 'averageRoutingTimeForRandom': 39.174157303370784},
-                'percentWithSmart': 60},
-               {'result': {'averageRoutingDistance': 385.30661573825685, 'averageRoutingTime': 33.882521489971346,
-                           'averageRoutingDistanceForRandom': 496.30661573825685, 'averageRoutingTimeForSmart': 0.0,
-                           'averageRoutingDistanceForSmart': 365.51525525325325, 'averageRoutingTimeForRandom': 33.882521489971346},
-                'percentWithSmart': 80},
-               {'result': {'averageRoutingDistance': 372.23285007199578, 'averageRoutingTime': 35.81172839506173,
-                           'averageRoutingDistanceForRandom': 0.0, 'averageRoutingTimeForSmart': 0.0,
-                           'averageRoutingDistanceForSmart': 372.23285007199578, 'averageRoutingTimeForRandom': 35.81172839506173},
-                'percentWithSmart': 100}]
+    # results = [{'result': {'averageRoutingDistance': 485.379537123818, 'averageRoutingTime': 33.770833333333336,
+    #                        'averageRoutingDistanceForRandom': 485.379537123818, 'averageRoutingTimeForSmart': 0.0,
+    #                        'averageRoutingDistanceForSmart': 0.0, 'averageRoutingTimeForRandom': 33.770833333333336},
+    #             'percentWithSmart': 0},
+    #            {'result': {'averageRoutingDistance': 450.7345417276763, 'averageRoutingTime': 41.83479532163743,
+    #                        'averageRoutingDistanceForRandom': 490.7345417276763, 'averageRoutingTimeForSmart': 0.0,
+    #                        'averageRoutingDistanceForSmart': 307.234235232523, 'averageRoutingTimeForRandom': 41.83479532163743},
+    #             'percentWithSmart': 20},
+    #            {'result': {'averageRoutingDistance': 433.53216305175144, 'averageRoutingTime': 35.63707865168539,
+    #                        'averageRoutingDistanceForRandom': 484.53216305175144, 'averageRoutingTimeForSmart': 0.0,
+    #                        'averageRoutingDistanceForSmart': 323.325235235325, 'averageRoutingTimeForRandom': 35.63707865168539},
+    #             'percentWithSmart': 40},
+    #            {'result': {'averageRoutingDistance': 411.80687638269833, 'averageRoutingTime': 39.174157303370784,
+    #                        'averageRoutingDistanceForRandom': 489.80687638269833, 'averageRoutingTimeForSmart': 0.0,
+    #                        'averageRoutingDistanceForSmart': 342.2535353266623, 'averageRoutingTimeForRandom': 39.174157303370784},
+    #             'percentWithSmart': 60},
+    #            {'result': {'averageRoutingDistance': 385.30661573825685, 'averageRoutingTime': 33.882521489971346,
+    #                        'averageRoutingDistanceForRandom': 496.30661573825685, 'averageRoutingTimeForSmart': 0.0,
+    #                        'averageRoutingDistanceForSmart': 365.51525525325325, 'averageRoutingTimeForRandom': 33.882521489971346},
+    #             'percentWithSmart': 80},
+    #            {'result': {'averageRoutingDistance': 372.23285007199578, 'averageRoutingTime': 35.81172839506173,
+    #                        'averageRoutingDistanceForRandom': 0.0, 'averageRoutingTimeForSmart': 0.0,
+    #                        'averageRoutingDistanceForSmart': 372.23285007199578, 'averageRoutingTimeForRandom': 35.81172839506173},
+    #             'percentWithSmart': 100}]
 
     # results = np.load(RESULTS_FILE, allow_pickle=True)
     plot_results(results)
