@@ -67,7 +67,7 @@ class TraciClient():
     def __init__(self, traciLabel, sumoBinary, totalParkingSpots,
                  totalVehiclesToPark, parking_need_probability, phereomone_contribution_coefficient,
                  phereomone_decay_coefficient, cooldown_after_scheduled, max_steps, totalVehiclesToLoad,
-                 percentToRandomRoute):
+                 percentToRandomRoute=0, edgeIDToTrackNeighborsPheromones=None):
         # traci starts sumo as a subprocess and then this script connects and runs
         traci.start([sumoBinary, "-c", "aco.sumocfg",
                      "--tripinfo-output", "../output/tripinfo.xml"], label=traciLabel)
@@ -89,6 +89,9 @@ class TraciClient():
         self.totalVehiclesToLoad = totalVehiclesToLoad
         self.totalVehiclesLookingToPark = int(round(self.parkingNeedProbability * self.totalVehiclesToLoad))
         self.percentToRandomRoute = percentToRandomRoute
+        self.initialize_global_variables()
+        self.edgeIDToTrackNeighborsPheromones = edgeIDToTrackNeighborsPheromones
+        self.trackedPhereomoneLevels = {}
 
     def calc_prob_of_free_spots(self, edgeID, availableParkingSpaces, movingVehiclesCount):
         if availableParkingSpaces == 0:
@@ -263,7 +266,7 @@ class TraciClient():
 
         routingDistance = self.travelInfo[vehID]['finish_distance'] - self.travelInfo[vehID]['start_distance']
         routingTime = self.travelInfo[vehID]['finish_time'] - self.travelInfo[vehID]['start_time']
-        
+
         self.totalRoutingDistance += routingDistance
         self.totalRoutingTime += routingTime
 
@@ -378,11 +381,21 @@ class TraciClient():
             self.timeStep += 1
         logging.info('All vehicles have been loaded into the network.')
 
+    def trackNeighborsPheromones(self):
+        for neighborEdge in self.edges[self.edgeIDToTrackNeighborsPheromones]['neighbors']:
+            if self.trackedPhereomoneLevels.get(neighborEdge) is None:
+                self.trackedPhereomoneLevels[neighborEdge] = []
+            self.trackedPhereomoneLevels[neighborEdge].append(self.pheromoneLevels[neighborEdge])
+
     def start_simulation(self):
         self.maxSteps += self.timeStep
         while self.traciConnection.simulation.getMinExpectedNumber() > 0 and self.timeStep < self.maxSteps:
             self.traciConnection.simulationStep()
             logging.info("Simulation Step: {}".format(self.timeStep))
+
+            if self.edgeIDToTrackNeighborsPheromones is not None:
+                self.trackNeighborsPheromones()
+
             newPheromones = {}  # sum of pheromones added by any vehicles in this time step
             for edgeID in self.edges:
                 newPheromones[edgeID] = 0
@@ -472,6 +485,14 @@ class TraciClient():
                 nextState = VehicleState.SCHEDULED_TO_PARK
         self.travelInfo[vehID]['vehicle_state'] = nextState
 
+    def initialize_global_variables(self):
+        # initialize the simulation wide variables
+        self.edges = self.get_all_edges()
+        self.pheromoneLevels = {}
+        for edgeID in self.edges:
+            self.pheromoneLevels[edgeID] = 1
+        self.parkedVehicles = set()
+
     # contains TraCI control loop
     def run(self):
         if self.totalVehiclesLookingToPark < self.totalVehiclesToPark:
@@ -479,13 +500,6 @@ class TraciClient():
             self.traciConnection.close()
             sys.stdout.flush()
             return None
-
-        # initialize the simulation wide variables
-        self.edges = self.get_all_edges()
-        self.pheromoneLevels = {}
-        for edgeID in self.edges:
-            self.pheromoneLevels[edgeID] = 1
-        self.parkedVehicles = set()
 
         self.timeStep = 1
         self.wait_for_vehicles_to_load()
@@ -498,13 +512,17 @@ class TraciClient():
         logging.info('Average Routing Distance: {}'.format(self.totalRoutingDistance / self.totalTrips))
         self.traciConnection.close()
         sys.stdout.flush()
-        return {'averageRoutingDistance': self.totalRoutingDistance / self.totalTrips, 
-                'averageRoutingTime': self.totalRoutingTime / self.totalTrips,
-                'averageRoutingDistanceForSmart': self.totalRoutingDistanceForSmart / self.totalTrips,
-                'averageRoutingDistanceForRandom': self.totalRoutingDistanceForRandom / self.totalTrips,
-                'averageRoutingTimeForSmart': self.totalRoutingTimeForSmart / self.totalTrips,
-                'averageRoutingTimeForRandom': self.totalRoutingTimeForRandom / self.totalTrips
-                }
+        result = {'averageRoutingDistance': self.totalRoutingDistance / self.totalTrips,
+                  'averageRoutingTime': self.totalRoutingTime / self.totalTrips,
+                  'averageRoutingDistanceForSmart': self.totalRoutingDistanceForSmart / self.totalTrips,
+                  'averageRoutingDistanceForRandom': self.totalRoutingDistanceForRandom / self.totalTrips,
+                  'averageRoutingTimeForSmart': self.totalRoutingTimeForSmart / self.totalTrips,
+                  'averageRoutingTimeForRandom': self.totalRoutingTimeForRandom / self.totalTrips,
+                  'trackedPheromoneLevels': None
+                  }
+        if self.edgeIDToTrackNeighborsPheromones is not None:
+            result['trackedPheromoneLevels'] = self.trackedPhereomoneLevels
+        return result
 
 
 if __name__ == "__main__":

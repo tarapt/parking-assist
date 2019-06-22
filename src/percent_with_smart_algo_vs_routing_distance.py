@@ -114,4 +114,4 @@ if __name__ == "__main__":
                 'percentWithSmart': 100}]
 
     # results = np.load(RESULTS_FILE, allow_pickle=True)
-    plot_results()
+    plot_results(results)
