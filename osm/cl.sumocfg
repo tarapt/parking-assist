@@ -3,9 +3,9 @@
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
 
     <input>
-        <net-file value="aco.net.xml"/>
-        <route-files value="aco.routes.xml"/>
-        <additional-files value="aco.add.xml"/>
+        <net-file value="cl.net.xml"/>
+        <route-files value="cl.flow_routes.xml"/>
+        <!-- <additional-files value="cl.add.xml"/> -->
     </input>
 
 </configuration>

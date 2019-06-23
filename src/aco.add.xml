@@ -1,24 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <additional xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/additional_file.xsd">
-	<parkingArea id="parkingArea_-gneE9_0_67" length="40" lane="-gneE9_0" friendlyPos="1" roadsideCapacity="0" startPos="45.42" endPos="85.42" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE54_0_21" length="40" lane="gneE54_0" friendlyPos="1" roadsideCapacity="3" startPos="45.32" endPos="85.32" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE107_0_101" length="40" lane="gneE107_0" friendlyPos="1" roadsideCapacity="2" startPos="69.86" endPos="109.86" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_-gneE108_0_105" length="40" lane="-gneE108_0" friendlyPos="1" roadsideCapacity="1" startPos="68.5" endPos="108.50" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE51_0_73" length="40" lane="gneE51_0" friendlyPos="1" roadsideCapacity="4" startPos="12.99" endPos="52.99" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_-gneE105_0_96" length="40" lane="-gneE105_0" friendlyPos="1" roadsideCapacity="3" startPos="67.28" endPos="107.28" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_-gneE111_0_108" length="80" lane="-gneE111_0" friendlyPos="1" roadsideCapacity="14" startPos="188.96" endPos="268.96" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_-gneE12_0_36" length="40" lane="-gneE12_0" friendlyPos="1" roadsideCapacity="4" startPos="12.86" endPos="52.86" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_-gneE13_0_38" length="40" lane="-gneE13_0" friendlyPos="1" roadsideCapacity="2" startPos="46.94" endPos="86.94" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_-gneE106_0_102" length="40" lane="-gneE106_0" friendlyPos="1" roadsideCapacity="3" startPos="67.26" endPos="107.26" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_-gneE107_0_100" length="40" lane="-gneE107_0" friendlyPos="1" roadsideCapacity="4" startPos="69.13" endPos="109.13" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE105_0_97" length="40" lane="gneE105_0" friendlyPos="1" roadsideCapacity="6" startPos="69.7" endPos="109.70" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE111_0_109" length="80" lane="gneE111_0" friendlyPos="1" roadsideCapacity="11" startPos="189.54" endPos="269.54" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE50_0_75" length="40" lane="gneE50_0" friendlyPos="1" roadsideCapacity="6" startPos="47.15" endPos="87.15" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE109_0_113" length="80" lane="gneE109_0" friendlyPos="1" roadsideCapacity="18" startPos="191.73" endPos="271.73" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_-gneE10_0_52" length="40" lane="-gneE10_0" friendlyPos="1" roadsideCapacity="9" startPos="14.35" endPos="54.35" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE13_0_39" length="40" lane="gneE13_0" friendlyPos="1" roadsideCapacity="2" startPos="45.12" endPos="85.12" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE53_0_29" length="40" lane="gneE53_0" friendlyPos="1" roadsideCapacity="3" startPos="13.15" endPos="53.15" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE24_0_100" length="40" lane="gneE24_0" friendlyPos="1" roadsideCapacity="2" startPos="40.02" endPos="80.02" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE9_0_53" length="40" lane="gneE9_0" friendlyPos="1" roadsideCapacity="3" startPos="45.14" endPos="85.14" onRoad="False"></parkingArea>
-	<parkingArea id="parkingArea_gneE5_0_60" length="40" lane="gneE5_0" friendlyPos="1" roadsideCapacity="2" startPos="46.33" endPos="86.33" onRoad="False"></parkingArea>
+	<parkingArea id="parkingArea_-gneE101_0_2" lane="-gneE101_0" friendlyPos="1" startPos="28.53" endPos="68.53" roadsideCapacity="4"></parkingArea>
+	<parkingArea id="parkingArea_-gneE7_0_3" lane="-gneE7_0" friendlyPos="1" startPos="26.99" endPos="66.99" roadsideCapacity="1"></parkingArea>
+	<parkingArea id="parkingArea_-gneE97_0_1" lane="-gneE97_0" friendlyPos="1" startPos="30.38" endPos="70.38" roadsideCapacity="4"></parkingArea>
+	<parkingArea id="parkingArea_gneE37_0_0" lane="gneE37_0" friendlyPos="1" startPos="31.86" endPos="71.86" roadsideCapacity="4"></parkingArea>
+	<parkingArea id="parkingArea_gneE48_0_4" lane="gneE48_0" friendlyPos="1" startPos="30.40" endPos="70.40" roadsideCapacity="3"></parkingArea>
+	<parkingArea id="parkingArea_gneE99_0_5" lane="gneE99_0" friendlyPos="1" startPos="28.97" endPos="68.97" roadsideCapacity="5"></parkingArea>
 </additional>
