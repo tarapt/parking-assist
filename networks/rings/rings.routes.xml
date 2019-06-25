@@ -3,7 +3,7 @@
   <vType accel="1.0" decel="5.0" id="Car" length="5.0" minGap="2.0" maxSpeed="10.0" sigma="0" />
   
   <flow id="veh_left1" color="1,1,0" begin="0" end= "1000" period="10" type="Car">
-    <route edges="-gneE110" />
+    <route edges="gneE10" />
   </flow>
 
 </routes>

@@ -8,13 +8,7 @@ from enum import Enum
 import numpy as np
 from scipy.special import bdtr
 from xml_to_networkx import NetworkGenerator
-
-logging.basicConfig(
-    format='%(levelname)s: %(message)s',
-    level=logging.INFO,
-    filename='../output/traci.log',
-    filemode='w'
-)
+from configparser import ConfigParser
 
 # we need to import some python modules from the $SUMO_HOME/tools directory
 if 'SUMO_HOME' in os.environ:
@@ -28,7 +22,18 @@ from sumolib import checkBinary  # Checks for the binary in environ vars
 import traci
 
 
-TOTAL_VEHICLES_TO_LOAD = 100
+def parseArgs():
+    parser = argparse.ArgumentParser(description="parameters for aco simulation")
+    parser.add_argument("network", type=str, help="name of the network")
+    parser.add_argument('--use-gui', default=False,
+                        action='store_true', help="whether to load the gui or not")
+    args = parser.parse_args()
+    return args.network, args.use_gui
+
+
+CONFIG_FILE = '../networks/{}/{}.ini'
+LOG_FILE = '../output/{}/traci.log'
+SUMOCFG_FILE = "../networks/{}/{}.sumocfg"
 
 
 class VehicleState(Enum):
@@ -40,10 +45,23 @@ class VehicleState(Enum):
     PARKING_NOT_NEEDED = 5
 
 
+class SimulationState(Enum):
+    LOADING_VEHICLES = 0
+    PARKING_INITIAL_VEHICLES = 1
+    PHEROMONE_GENERATION = 2
+
+
+class RoutingMode(Enum):
+    RANDOM = 0
+    PHEROMONE = 1
+    ASTAR = 2
+
+
 class TraciClient():
     def __init__(self, traciLabel, sumoBinary, parking_need_probability, phereomone_contribution_coefficient,
-                 phereomone_decay_coefficient, cooldown_after_scheduled, max_steps, totalVehiclesToLoad,
-                 percentToRandomRoute=0, edgeIDToTrackNeighborsPheromones=None):
+                 phereomone_decay_coefficient, cooldown_after_scheduled, max_steps, totalVehiclesToLoad, network,
+                 freeParkingSpotsPercent=50, percentToRandomRoute=0, edgeIDToTrackNeighborsPheromones=None):
+        self.network = network
         self.parkingNeedProbability = parking_need_probability
         self.phereomoneContributionCoefficient = phereomone_contribution_coefficient
         self.phereomoneDecayCoefficient = phereomone_decay_coefficient
@@ -51,16 +69,17 @@ class TraciClient():
         self.maxSteps = max_steps
         self.totalVehiclesToLoad = totalVehiclesToLoad
         self.percentToRandomRoute = percentToRandomRoute
+        self.freeParkingSpotsPercent = freeParkingSpotsPercent
         self.edgeIDToTrackNeighborsPheromones = edgeIDToTrackNeighborsPheromones
         self.initialize_global_variables()
-        traci.start([sumoBinary, "-c", "aco.sumocfg"], label=traciLabel)
+        traci.start([sumoBinary, "-c", SUMOCFG_FILE.format(network, network)], label=traciLabel)
         self.traciConnection = traci.getConnection(traciLabel)
 
     def initialize_global_variables(self):
         # initialize the simulation wide variables
-        ng = NetworkGenerator()
+        ng = NetworkGenerator(network=self.network)
         self.G = ng.edgeGraph
-        self.totalVehiclesToPark = ng.totalParkingSpots - 1
+        self.totalVehiclesToPark = int((1 - self.freeParkingSpotsPercent / 100) * ng.totalParkingSpots)
         self.pheromoneLevels = {}
         for edgeID in self.G.nodes():
             self.pheromoneLevels[edgeID] = 1
@@ -73,8 +92,10 @@ class TraciClient():
         self.totalRoutingTimeForRandom = 0
         self.totalTrips = 0
         self.trackedPhereomoneLevels = {}
+        if self.edgeIDToTrackNeighborsPheromones:
+            logging.info('Neighbors of {} to track: {}'.format(self.edgeIDToTrackNeighborsPheromones, self.G[self.edgeIDToTrackNeighborsPheromones]))
         self.totalVehiclesLookingToPark = int(round(self.parkingNeedProbability * self.totalVehiclesToLoad))
-        logging.info('Total Parking Spots: {}'.format(self.totalVehiclesToPark))
+        logging.info('Total Vehicles To Park: {}'.format(self.totalVehiclesToPark))
         logging.info('Vehicles Looking To Park: {}'.format(self.totalVehiclesLookingToPark))
 
     def run(self):
@@ -90,8 +111,9 @@ class TraciClient():
         self.selectVehiclesWhichWantToRandomRoute()
         self.park_the_initial_set_of_vehicles()
         self.start_simulation()
+        results = self.compute_results()
         self.traciConnection.close()
-        return self.compute_results()
+        return results
 
     def compute_results(self):
         logging.info('Total Routing Distance: {}, Total Trips: {}'.format(self.totalRoutingDistance, self.totalTrips))
@@ -102,13 +124,18 @@ class TraciClient():
                   'averageRoutingDistanceForRandom': self.totalRoutingDistanceForRandom / self.totalTrips,
                   'averageRoutingTimeForSmart': self.totalRoutingTimeForSmart / self.totalTrips,
                   'averageRoutingTimeForRandom': self.totalRoutingTimeForRandom / self.totalTrips,
-                  'trackedPheromoneLevels': None
+                  'trackedPheromoneLevels': None,
+                  'totalTrips': self.totalTrips
                   }
+        logging.info(result)
+        logging.info('Total Routing Distance: {}'.format(self.totalRoutingDistance))
+        logging.info('Sum of Routing Distances: {}'.format(self.totalRoutingDistanceForSmart + self.totalRoutingDistanceForRandom))
         if self.edgeIDToTrackNeighborsPheromones is not None:
             result['trackedPheromoneLevels'] = self.trackedPhereomoneLevels
         return result
 
     def start_simulation(self):
+        self.simulationState = SimulationState.PHEROMONE_GENERATION
         self.maxSteps += self.timeStep
         while self.traciConnection.simulation.getMinExpectedNumber() > 0 and self.timeStep < self.maxSteps:
             self.traciConnection.simulationStep()
@@ -120,11 +147,6 @@ class TraciClient():
                 newPheromones[edgeID] = 0
             for vehID in self.traciConnection.vehicle.getIDList():
                 self.updateTravelledDistance(vehID)
-                if (self.travelInfo[vehID]['vehicle_state'] == VehicleState.PARKING_NOT_NEEDED or
-                        self.travelInfo[vehID]['routing_mode'] == 'random'):
-                    self.random_routing_from_edge_neighbors(vehID)
-                else:
-                    self.pheromone_based_routing_from_edge_neighbors(vehID)
                 currentEdgeID = self.traciConnection.vehicle.getRoadID(vehID)
                 if currentEdgeID in self.G:
                     self.fsm(vehID, currentEdgeID, newPheromones)
@@ -138,9 +160,20 @@ class TraciClient():
         if currentState == VehicleState.PARKED:
             pass
         elif currentState == VehicleState.GO_TO_HOME:
-            nextState = VehicleState.GOING_TO_HOME
+            shortestPath = nx.astar_path(self.G, currentEdgeID, HOME_EDGE)
+            logging.info('Shortest Path To Home: {}'.format(shortestPath))
+            try:
+                self.traciConnection.vehicle.setRoute(vehID, shortestPath)
+            except Exception as e:
+                raise Exception(e)
+            else:
+                nextState = VehicleState.GOING_TO_HOME
+                logging.info('{} is going to home edge.'.format(vehID))
         elif currentState == VehicleState.GOING_TO_HOME:
-            nextState = VehicleState.SEARCHING_PARKING_AREA
+            if currentEdgeID == HOME_EDGE:
+                logging.info('{} has reached home edge {}, now searching for parking area.'.format(vehID, currentEdgeID))
+                self.update_start_metrics(vehID)
+                nextState = VehicleState.SEARCHING_PARKING_AREA
         elif currentState == VehicleState.SCHEDULED_TO_PARK:
             if self.traciConnection.vehicle.isStoppedParking(vehID):
                 logging.info("Vehicle {} which was scheduled to park has stopped at {}.".format(vehID, self.travelInfo[vehID]['scheduled_parking_area']['id']))
@@ -161,6 +194,13 @@ class TraciClient():
         elif currentState == VehicleState.SEARCHING_PARKING_AREA:
             if self.try_to_schedule_a_parking(currentEdgeID, vehID):
                 nextState = VehicleState.SCHEDULED_TO_PARK
+
+        if currentState != VehicleState.GO_TO_HOME and currentState != VehicleState.GOING_TO_HOME:
+            if (currentState == VehicleState.PARKING_NOT_NEEDED or
+                    self.travelInfo[vehID]['routing_mode'] == RoutingMode.RANDOM):
+                self.random_routing_from_edge_neighbors(vehID)
+            else:
+                self.pheromone_based_routing_from_edge_neighbors(vehID)
         self.travelInfo[vehID]['vehicle_state'] = nextState
 
     def unparkARandomVehicle(self, vehicleToNotRemove):
@@ -178,16 +218,16 @@ class TraciClient():
             except Exception as e:
                 logging.error(e)
             else:
-                # bring a vehicle from PARKING_NOT_NEEDED to SEARCHING_PARKING_AREA
+                # but first, bring a vehicle from PARKING_NOT_NEEDED to GO_TO_HOME
                 temp = []
                 for vehID, data in self.travelInfo.items():
                     if data['vehicle_state'] == VehicleState.PARKING_NOT_NEEDED:
                         temp.append(vehID)
                 newVehicleID = random.choice(temp)
-                self.travelInfo[newVehicleID]['vehicle_state'] = VehicleState.SEARCHING_PARKING_AREA
+                self.travelInfo[newVehicleID]['vehicle_state'] = VehicleState.GO_TO_HOME
                 self.travelInfo[newVehicleID]['routing_mode'] = self.travelInfo[vehIDToRemove]['routing_mode']
-                self.update_start_metrics(newVehicleID)
-                self.travelInfo[vehIDToRemove]['routing_mode'] = 'random'
+                # finish unparking the random vehicle
+                self.travelInfo[vehIDToRemove]['routing_mode'] = RoutingMode.RANDOM
                 self.travelInfo[vehIDToRemove]['vehicle_state'] = VehicleState.PARKING_NOT_NEEDED
                 self.parkedVehicles.remove(vehIDToRemove)
                 self.travelInfo[vehIDToRemove]['parked_area']['occupancy'] -= 1
@@ -202,6 +242,7 @@ class TraciClient():
         self.travelInfo[vehID]['start_time'] = self.timeStep
         self.travelInfo[vehID]['finish_time'] = None
 
+    # implement this in O(1), using the 'path_length_travelled' metric
     def addPheromonesToTheLastPath(self, vehID, newPheromones):
         # get the edges travelled by the vehicle since it last got parked
         vehRoute = self.traciConnection.vehicle.getRoute(vehID)
@@ -218,23 +259,24 @@ class TraciClient():
             newPheromones[edgeID] += 1.0 / pathLength
 
     def update_finish_metrics(self, vehID):
+        self.travelInfo[vehID]['finish_route_id'] = self.traciConnection.vehicle.getRouteIndex(vehID)
         self.travelInfo[vehID]['finish_distance'] = self.travelInfo[vehID]['distance_travelled']
         self.travelInfo[vehID]['finish_time'] = self.timeStep
         routingDistance = self.travelInfo[vehID]['finish_distance'] - self.travelInfo[vehID]['start_distance']
         routingTime = self.travelInfo[vehID]['finish_time'] - self.travelInfo[vehID]['start_time']
         self.totalRoutingDistance += routingDistance
         self.totalRoutingTime += routingTime
-        if self.travelInfo[vehID]['routing_mode'] == 'random':
+        if self.travelInfo[vehID]['routing_mode'] == RoutingMode.RANDOM:
             self.totalRoutingDistanceForRandom += routingDistance
             self.totalRoutingTimeForRandom += routingTime
         else:
             self.totalRoutingDistanceForSmart += routingDistance
             self.totalRoutingTimeForSmart += routingTime
         self.totalTrips += 1
-        # mark the current position on the route
-        self.travelInfo[vehID]['finish_route_id'] = self.traciConnection.vehicle.getRouteIndex(vehID)
+        logging.info('Trips completed: {}'.format(self.totalTrips))
 
     def wait_for_vehicles_to_load(self):
+        self.simulationState = SimulationState.LOADING_VEHICLES
         loadedVehicles = 0
         while self.traciConnection.simulation.getMinExpectedNumber() > 0 and loadedVehicles < self.totalVehiclesToLoad:
             self.traciConnection.simulationStep()
@@ -257,9 +299,10 @@ class TraciClient():
                                       'finish_route_id': None,
                                       'cooldown_counter': 0,
                                       'distance_travelled': 0,
+                                      'path_length_travelled': 0,
                                       'start_time': 0,
                                       'finish_time': None,
-                                      'routing_mode': 'random'}
+                                      'routing_mode': RoutingMode.RANDOM}
 
     def selectVehiclesWhichWantToPark(self):
         loadedVehicles = list(self.traciConnection.vehicle.getIDList())
@@ -273,11 +316,12 @@ class TraciClient():
         loadedVehicles = list(self.traciConnection.vehicle.getIDList())
         random.shuffle(loadedVehicles)
         for i in range(numVehiclesToRandomRoute):
-            self.travelInfo[loadedVehicles[i]]['routing_mode'] = 'random'
+            self.travelInfo[loadedVehicles[i]]['routing_mode'] = RoutingMode.RANDOM
         for i in range(numVehiclesToRandomRoute, len(loadedVehicles)):
-            self.travelInfo[loadedVehicles[i]]['routing_mode'] = 'pheromone'
+            self.travelInfo[loadedVehicles[i]]['routing_mode'] = RoutingMode.PHEROMONE
 
     def park_the_initial_set_of_vehicles(self):
+        self.simulationState = SimulationState.PARKING_INITIAL_VEHICLES
         while(self.traciConnection.simulation.getMinExpectedNumber() > 0 and
               len(self.parkedVehicles) < self.totalVehiclesToPark):
             self.traciConnection.simulationStep()
@@ -290,10 +334,14 @@ class TraciClient():
                     self.init_period_fsm(vehID, currentEdgeID)
             self.timeStep += 1
         logging.info("Simulation Step: {}, Parked Vehicles: {}".format(self.timeStep, len(self.parkedVehicles)))
+        vehiclesGoingToHomeCount = 0
         for vehID in self.traciConnection.vehicle.getIDList():
+            logging.info('Vehicle: {}, state: {}'.format(vehID, self.travelInfo[vehID]['vehicle_state'].name))
             if self.travelInfo[vehID]['vehicle_state'] == VehicleState.SEARCHING_PARKING_AREA:
-                self.travelInfo[vehID]['vehicle_state'] == VehicleState.GO_TO_HOME
-        logging.info("Initial set of vehicles have been parked in the network. Remaining vehicles' state changed to {}.".format(VehicleState.GO_TO_HOME.name))
+                self.travelInfo[vehID]['vehicle_state'] = VehicleState.GO_TO_HOME
+                vehiclesGoingToHomeCount += 1
+        logging.info("Initial set of vehicles have been parked in the network. "
+                     "Remaining {} vehicles' state changed to {}.".format(vehiclesGoingToHomeCount, VehicleState.GO_TO_HOME.name))
 
     def updateTravelledDistance(self, vehID):
         # the value given by self.traciConnection.vehicle.getDistance() becomes negative when the vehicle is parked
@@ -302,6 +350,7 @@ class TraciClient():
         if d > self.travelInfo[vehID]['distance_travelled']:
             self.travelInfo[vehID]['distance_travelled'] = d
 
+    # implement this in O(1) - remove dependency on getRoute
     def random_routing_from_edge_neighbors(self, vehID):
         vehRoute = self.traciConnection.vehicle.getRoute(vehID)
         currentIndexOnRoute = self.traciConnection.vehicle.getRouteIndex(vehID)
@@ -316,6 +365,11 @@ class TraciClient():
                     logging.warning(e)
                 except Exception as e:
                     logging.error(e)
+                else:
+                    if self.simulationState == SimulationState.PHEROMONE_GENERATION:
+                        self.travelInfo[vehID]['path_length_travelled'] += self.G.nodes[currentEdgeID]['length']
+                    return True
+        return False
 
     def init_period_fsm(self, vehID, currentEdgeID):
         currentState = self.travelInfo[vehID]['vehicle_state']
@@ -354,7 +408,7 @@ class TraciClient():
             if parkingArea['occupancy'] < parkingArea['capacity']:
                 try:
                     logging.info('Trying to schedule parking for {} on {} at {}'.format(vehID, currentEdgeID, parkingArea['id']))
-                    self.traciConnection.vehicle.setParkingAreaStop(vehID, parkingArea['id'], duration=100000)
+                    self.traciConnection.vehicle.setParkingAreaStop(vehID, parkingArea['id'], duration=1000000)
                 except traci.exceptions.TraCIException as e:
                     logging.warning(e)
                 except Exception as e:
@@ -384,6 +438,7 @@ class TraciClient():
                 self.trackedPhereomoneLevels[neighborEdge] = []
             self.trackedPhereomoneLevels[neighborEdge].append(self.pheromoneLevels[neighborEdge])
 
+    # # implement this in O(1) - remove dependency on getRoute
     def pheromone_based_routing_from_edge_neighbors(self, vehID):
         vehRoute = self.traciConnection.vehicle.getRoute(vehID)
         currentIndexOnRoute = self.traciConnection.vehicle.getRouteIndex(vehID)
@@ -397,7 +452,17 @@ class TraciClient():
                 for i in range(len(neighborEdges)):
                     probabilities[i] = turnProbability[neighborEdges[i]]
                 nextEdgeID = np.random.choice(neighborEdges, p=probabilities)
-                self.traciConnection.vehicle.setRoute(vehID, [currentEdgeID, nextEdgeID])
+                try:
+                    self.traciConnection.vehicle.setRoute(vehID, [currentEdgeID, nextEdgeID])
+                except traci.exceptions.TraCIException as e:
+                    logging.warning(e)
+                except Exception as e:
+                    logging.error(e)
+                else:
+                    if self.simulationState == SimulationState.PHEROMONE_GENERATION:
+                        self.travelInfo[vehID]['path_length_travelled'] += self.G.nodes[currentEdgeID]['length']
+                    return True
+        return False
 
     def calculate_turn_probability_from_edge_neighbors(self, edgeID):
         turnProbability = {}
@@ -408,16 +473,29 @@ class TraciClient():
             turnProbability[neighborEdgeID] = self.pheromoneLevels[neighborEdgeID] / pheromoneSum
         return turnProbability
 
+
 if __name__ == "__main__":
-    gui = True
-    if gui:
+    NETWORK, useGui = parseArgs()
+    if useGui:
         sumoBinary = checkBinary('sumo-gui')
     else:
         sumoBinary = checkBinary('sumo')
 
+    logging.basicConfig(
+        format='%(levelname)s: %(message)s',
+        level=logging.INFO,
+        filename=LOG_FILE.format(NETWORK),
+        filemode='w'
+    )
+
+    config = ConfigParser()
+    config.read(CONFIG_FILE.format(NETWORK, NETWORK))
+    HOME_EDGE = config.get('simulation', 'homeEdge')
+    TOTAL_VEHICLES_TO_LOAD = config.getint('simulation', 'totalVehicles')
+
     client1 = TraciClient(str(1), sumoBinary, parking_need_probability=0.5,
                           phereomone_contribution_coefficient=200, phereomone_decay_coefficient=0.999,
                           cooldown_after_scheduled=30, max_steps=3000, totalVehiclesToLoad=TOTAL_VEHICLES_TO_LOAD,
-                          percentToRandomRoute=0)
+                          percentToRandomRoute=50, freeParkingSpotsPercent=50, network=NETWORK)
     client1.run()
     sys.stdout.flush()

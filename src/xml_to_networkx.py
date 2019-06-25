@@ -3,48 +3,22 @@ import numpy as np
 import random
 import xmltodict
 
-NETWORK_XML_FILE = 'aco.net.xml'
-ORIGINAL_ADDITIONAL_XML_FILE = 'aco.original.add.xml'
-ADDITIONAL_XML_FILE = 'aco.add.xml'
-
-
-def get_lane_information_from_xml():
-    laneDict = {}
-    with open(NETWORK_XML_FILE) as fd:
-        doc = xmltodict.parse(fd.read())
-        edgeList = doc['net']['edge']
-        for edge in edgeList:
-            if edge.get('@from') and edge.get('@to'):
-                if type(edge['lane']) == list:
-                    lanes = [lane['@id'] for lane in edge['lane']]
-                    length = edge['lane'][0]['@length']
-                else:
-                    lanes = [edge['lane']['@id']]
-                    length = edge['lane']['@length']
-                for lane in lanes:
-                    laneDict[lane] = {'edgeID': edge['@id'], 'length': float(length)}
-    return laneDict
-
-
-def get_lane_graph_from_xml_connections():
-    G = nx.DiGraph()
-    with open(NETWORK_XML_FILE) as fd:
-        doc = xmltodict.parse(fd.read())
-        connectionList = doc['net']['connection']
-        for connection in connectionList:
-            if connection['@from'][0] != ':' and connection['@to'][0] != ':':
-                G.add_edge(connection['@from'] + '_' + connection['@fromLane'], connection['@to'] + '_' + connection['@toLane'])
-    return G
+NETWORK_XML_FILE = '../networks/{}/{}.net.xml'
+ORIGINAL_ADDITIONAL_XML_FILE = '../networks/{}/{}.original.add.xml'
+ADDITIONAL_XML_FILE = '../networks/{}/{}.add.xml'
 
 
 class NetworkGenerator:
-    def __init__(self, seed=0):
+    def __init__(self, network, seed=0):
         random.seed(seed)
+        self.NETWORK_XML_FILE = NETWORK_XML_FILE.format(network, network)
+        self.ADDITIONAL_XML_FILE = ADDITIONAL_XML_FILE.format(network, network)
+        self.ORIGINAL_ADDITIONAL_XML_FILE = ORIGINAL_ADDITIONAL_XML_FILE.format(network, network)
         self.totalParkingSpots = 0
         self.minParkingSpots = 1
         self.maxParkingSpots = 5
-        self.laneDict = get_lane_information_from_xml()
-        self.laneGraph = get_lane_graph_from_xml_connections()
+        self.laneDict = self.get_lane_information_from_xml()
+        self.laneGraph = self.get_lane_graph_from_xml_connections()
         self.initialize_nodes_in_lane_graph()
         self.add_parking_areas_to_lanes()
         self.distribute_parking_spots()
@@ -53,6 +27,33 @@ class NetworkGenerator:
         self.add_node_info_to_edge_graph()
         self.remove_dead_ends()
         print(self.totalParkingSpots)
+
+    def get_lane_information_from_xml(self):
+        laneDict = {}
+        with open(self.NETWORK_XML_FILE) as fd:
+            doc = xmltodict.parse(fd.read())
+            edgeList = doc['net']['edge']
+            for edge in edgeList:
+                if edge.get('@from') and edge.get('@to'):
+                    if type(edge['lane']) == list:
+                        lanes = [lane['@id'] for lane in edge['lane']]
+                        length = edge['lane'][0]['@length']
+                    else:
+                        lanes = [edge['lane']['@id']]
+                        length = edge['lane']['@length']
+                    for lane in lanes:
+                        laneDict[lane] = {'edgeID': edge['@id'], 'length': float(length)}
+        return laneDict
+
+    def get_lane_graph_from_xml_connections(self):
+        G = nx.DiGraph()
+        with open(self.NETWORK_XML_FILE) as fd:
+            doc = xmltodict.parse(fd.read())
+            connectionList = doc['net']['connection']
+            for connection in connectionList:
+                if connection['@from'][0] != ':' and connection['@to'][0] != ':':
+                    G.add_edge(connection['@from'] + '_' + connection['@fromLane'], connection['@to'] + '_' + connection['@toLane'])
+        return G
 
     def get_dead_ends(self):
         deadEnds = set()
@@ -92,7 +93,7 @@ class NetworkGenerator:
             datadict['length'] = self.laneDict[laneID]['length']
 
     def add_parking_areas_to_lanes(self):
-        with open(ORIGINAL_ADDITIONAL_XML_FILE) as fd:
+        with open(self.ORIGINAL_ADDITIONAL_XML_FILE) as fd:
             doc = xmltodict.parse(fd.read())
             parkingAreaList = doc['additional']['parkingArea']
             for parkingArea in parkingAreaList:
@@ -115,7 +116,7 @@ class NetworkGenerator:
 
     def update_additional_xml(self):
         updatedAdditionalXml = None
-        with open(ORIGINAL_ADDITIONAL_XML_FILE) as fd:
+        with open(self.ORIGINAL_ADDITIONAL_XML_FILE) as fd:
             doc = xmltodict.parse(fd.read())
             parkingAreaList = doc['additional']['parkingArea']
             for parkingArea in parkingAreaList:
@@ -123,7 +124,7 @@ class NetworkGenerator:
             doc['additional']['parkingArea'] = parkingAreaList
             updatedAdditionalXml = xmltodict.unparse(doc, pretty=True)
         if updatedAdditionalXml is not None:
-            with open(ADDITIONAL_XML_FILE, 'w') as fd:
+            with open(self.ADDITIONAL_XML_FILE, 'w') as fd:
                 fd.write(updatedAdditionalXml)
 
     def get_edge_graph(self):

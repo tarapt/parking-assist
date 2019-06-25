@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from xml_to_networkx import NetworkGenerator
 from aco import TraciClient
+from configparser import ConfigParser
 
 # we need to import some python modules from the $SUMO_HOME/tools directory
 if 'SUMO_HOME' in os.environ:
@@ -15,24 +16,31 @@ else:
 
 from sumolib import checkBinary  # Checks for the binary in environ vars
 
+
+NETWORK = 'rings'
+CONFIG_FILE = '../networks/{}/{}.ini'.format(NETWORK, NETWORK)
+LOG_FILE = '../output/{}/traci.log'.format(NETWORK)
+RESULTS_FILE = '../output/{}/plot_neighbors_pheromones_results.npy'.format(NETWORK)
+
 logging.basicConfig(
     format='%(levelname)s: %(message)s',
-    level=logging.CRITICAL,
-    filename='../output/traci.log',
+    level=logging.INFO,
+    filename=LOG_FILE,
     filemode='w'
 )
-TOTAL_VEHICLES_TO_LOAD = 130
-RESULTS_FILE = 'plot_neighbors_pheromones_results.npy'
+TOTAL_VEHICLES_TO_LOAD = 100
 
 
 def run_experiment():
-    edgeIDToTrackNeighborsPheromones = '-gneE105'
-    logging.critical('Tracking neighbors pheromones on edges: {}'.format(edgeIDToTrackNeighborsPheromones))
-    client = TraciClient(str(1), sumoBinary, totalParkingSpots=102,
-                         totalVehiclesToPark=20, parking_need_probability=0.5,
+    config = ConfigParser()
+    config.read(CONFIG_FILE)
+    edgeIDToTrackNeighborsPheromones = config.get('tracking', 'edgeIDToTrackNeighborsPheromones')
+    logging.info('Tracking neighbors pheromones on edges: {}'.format(edgeIDToTrackNeighborsPheromones))
+    client = TraciClient(str(1), sumoBinary, parking_need_probability=0.5,
                          phereomone_contribution_coefficient=200, phereomone_decay_coefficient=0.999,
-                         cooldown_after_scheduled=30, max_steps=2000, totalVehiclesToLoad=TOTAL_VEHICLES_TO_LOAD,
-                         edgeIDToTrackNeighborsPheromones=edgeIDToTrackNeighborsPheromones)
+                         cooldown_after_scheduled=30, max_steps=1500, totalVehiclesToLoad=TOTAL_VEHICLES_TO_LOAD,
+                         percentToRandomRoute=50, edgeIDToTrackNeighborsPheromones=edgeIDToTrackNeighborsPheromones,
+                         freeParkingSpotsPercent=50, network=NETWORK)
     result = client.run()
     np.save(RESULTS_FILE, result, allow_pickle=True)
     return result
@@ -58,7 +66,6 @@ def plot_result(result):
     pheromoneLevelsOnNeighbors = None
     if result['trackedPheromoneLevels'] is not None:
         pheromoneLevelsOnNeighbors = result['trackedPheromoneLevels']
-    # logging.critical(pheromoneLevelsOnNeighbors)
     for edgeID, pheromoneLevels in pheromoneLevelsOnNeighbors.items():
         plt.plot(pheromoneLevels)
     plt.legend(list(pheromoneLevelsOnNeighbors.keys()), loc='upper left')
@@ -80,22 +87,6 @@ def plot_result(result):
 
 if __name__ == "__main__":
     sumoBinary = checkBinary('sumo')
-    # result = run_experiment()
+    result = run_experiment()
     result = np.load(RESULTS_FILE, allow_pickle=True).item()
     plot_result(result)
-
-
-# x = np.arange(14)
-# y = np.sin(x / 2)
-
-# plt.step(x, y + 2, label='pre (default)')
-# plt.plot(x, y + 2, 'C0o', alpha=0.5)
-
-# plt.step(x, y + 1, where='mid', label='mid')
-# plt.plot(x, y + 1, 'C1o', alpha=0.5)
-
-# plt.step(x, y, where='post', label='post')
-# plt.plot(x, y, 'C2o', alpha=0.5)
-
-# plt.legend(title='Parameter where:')
-# plt.show()

@@ -1,7 +1,7 @@
 .vscode/
 *.pyc
 src/__pycache__/
-src/aco.add.xml
-output/tripinfo.xml
 *.log
-src/graph.gpickle
+networks/aco/aco.add.xml
+networks/rings/rings.add.xml
+statistics/
