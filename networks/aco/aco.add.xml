@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <additional xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/additional_file.xsd">
 	<parkingArea id="parkingArea_-gneE101_0_2" lane="-gneE101_0" friendlyPos="1" startPos="28.53" endPos="68.53" roadsideCapacity="4"></parkingArea>
-	<parkingArea id="parkingArea_-gneE7_0_3" lane="-gneE7_0" friendlyPos="1" startPos="26.99" endPos="66.99" roadsideCapacity="1"></parkingArea>
+	<parkingArea id="parkingArea_-gneE7_0_3" lane="-gneE7_0" friendlyPos="1" startPos="26.99" endPos="66.99" roadsideCapacity="4"></parkingArea>
 	<parkingArea id="parkingArea_-gneE97_0_1" lane="-gneE97_0" friendlyPos="1" startPos="30.38" endPos="70.38" roadsideCapacity="5"></parkingArea>
-	<parkingArea id="parkingArea_gneE37_0_0" lane="gneE37_0" friendlyPos="1" startPos="31.86" endPos="71.86" roadsideCapacity="4"></parkingArea>
+	<parkingArea id="parkingArea_gneE37_0_0" lane="gneE37_0" friendlyPos="1" startPos="31.86" endPos="71.86" roadsideCapacity="1"></parkingArea>
 	<parkingArea id="parkingArea_gneE48_0_4" lane="gneE48_0" friendlyPos="1" startPos="30.40" endPos="70.40" roadsideCapacity="3"></parkingArea>
 	<parkingArea id="parkingArea_gneE99_0_5" lane="gneE99_0" friendlyPos="1" startPos="28.97" endPos="68.97" roadsideCapacity="4"></parkingArea>
 </additional>

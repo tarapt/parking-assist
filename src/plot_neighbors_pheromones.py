@@ -17,7 +17,7 @@ else:
 from sumolib import checkBinary  # Checks for the binary in environ vars
 
 
-NETWORK = 'rings'
+NETWORK = 'distance'
 CONFIG_FILE = '../networks/{}/{}.ini'.format(NETWORK, NETWORK)
 LOG_FILE = '../output/{}/traci.log'.format(NETWORK)
 RESULTS_FILE = '../output/{}/plot_neighbors_pheromones_results.npy'.format(NETWORK)
@@ -28,7 +28,6 @@ logging.basicConfig(
     filename=LOG_FILE,
     filemode='w'
 )
-TOTAL_VEHICLES_TO_LOAD = 100
 
 
 def run_experiment():
@@ -38,7 +37,7 @@ def run_experiment():
     logging.info('Tracking neighbors pheromones on edges: {}'.format(edgeIDToTrackNeighborsPheromones))
     client = TraciClient(str(1), sumoBinary, parking_need_probability=0.5,
                          phereomone_contribution_coefficient=200, phereomone_decay_coefficient=0.999,
-                         cooldown_after_scheduled=30, max_steps=1500, totalVehiclesToLoad=TOTAL_VEHICLES_TO_LOAD,
+                         cooldown_after_scheduled=30, max_steps=1500,
                          percentToRandomRoute=50, edgeIDToTrackNeighborsPheromones=edgeIDToTrackNeighborsPheromones,
                          freeParkingSpotsPercent=50, network=NETWORK)
     result = client.run()

@@ -1,11 +1,22 @@
 import networkx as nx
 import numpy as np
 import random
+import argparse
 import xmltodict
+from configparser import ConfigParser
 
+
+CONFIG_FILE = '../networks/{}/{}.ini'
 NETWORK_XML_FILE = '../networks/{}/{}.net.xml'
 ORIGINAL_ADDITIONAL_XML_FILE = '../networks/{}/{}.original.add.xml'
 ADDITIONAL_XML_FILE = '../networks/{}/{}.add.xml'
+
+
+def parseArgs():
+    parser = argparse.ArgumentParser(description="parameters for aco simulation")
+    parser.add_argument("network", type=str, help="name of the network")
+    args = parser.parse_args()
+    return args.network
 
 
 class NetworkGenerator:
@@ -14,9 +25,11 @@ class NetworkGenerator:
         self.NETWORK_XML_FILE = NETWORK_XML_FILE.format(network, network)
         self.ADDITIONAL_XML_FILE = ADDITIONAL_XML_FILE.format(network, network)
         self.ORIGINAL_ADDITIONAL_XML_FILE = ORIGINAL_ADDITIONAL_XML_FILE.format(network, network)
+        config = ConfigParser()
+        config.read(CONFIG_FILE.format(network, network))
+        self.minParkingSpots = config.getint('parking', 'minParkingSpots')
+        self.maxParkingSpots = config.getint('parking', 'maxParkingSpots')
         self.totalParkingSpots = 0
-        self.minParkingSpots = 1
-        self.maxParkingSpots = 5
         self.laneDict = self.get_lane_information_from_xml()
         self.laneGraph = self.get_lane_graph_from_xml_connections()
         self.initialize_nodes_in_lane_graph()
@@ -26,7 +39,14 @@ class NetworkGenerator:
         self.edgeGraph = self.get_edge_graph()
         self.add_node_info_to_edge_graph()
         self.remove_dead_ends()
+        self.edgesWithParkingPlaces = self.get_edges_with_parking_places()
         print(self.totalParkingSpots)
+
+    def get_edges_with_parking_places(self):
+        edgesWithParkingPlaces = []
+        for laneID in self.lanesWithParkingPlaces:
+            edgesWithParkingPlaces.append(self.laneGraph.nodes[laneID]['parent_edge'])
+        return edgesWithParkingPlaces
 
     def get_lane_information_from_xml(self):
         laneDict = {}
@@ -66,7 +86,7 @@ class NetworkGenerator:
         while(True):
             deadEnds = self.get_dead_ends()
             if len(deadEnds) > 0:
-                print('Deadends: '.format(deadEnds))
+                print('Deadends: {}'.format(deadEnds))
                 for node in deadEnds:
                     self.edgeGraph.remove_node(node)
             else:
@@ -105,9 +125,11 @@ class NetworkGenerator:
                 })
 
     def distribute_parking_spots(self):
+        self.lanesWithParkingPlaces = []
         self.parkingAreaCapacity = {}
         for laneID, datadict in self.laneGraph.nodes.items():
             if datadict.get('parking_areas') and len(datadict['parking_areas']) > 0:
+                self.lanesWithParkingPlaces.append(laneID)
                 for parkingArea in datadict['parking_areas']:
                     parkingArea['capacity'] = random.randint(self.minParkingSpots, self.maxParkingSpots)
                     print(parkingArea['id'], parkingArea['capacity'])
@@ -138,5 +160,6 @@ class NetworkGenerator:
 
 
 if __name__ == "__main__":
-    ng = NetworkGenerator()
-    # ng.print_edge_graph()
+    network = parseArgs()
+    ng = NetworkGenerator(network, seed=10)
+    ng.print_edge_graph()

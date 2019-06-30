@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on Tuesday 25 June 2019 07:44:17 PM IST by Eclipse SUMO netedit Version 1.2.0
+<!-- generated on Wednesday 26 June 2019 01:19:00 AM IST by Eclipse SUMO netedit Version 1.2.0
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
 
     <input>
-        <sumo-net-file value="/home/tara/codes/aco/networks/rings/rings.net.xml"/>
+        <sumo-net-file value="/home/tara/codes/aco/networks/distance/distance.net.xml"/>
     </input>
 
     <output>
-        <output-file value="/home/tara/codes/aco/networks/rings/rings.net.xml"/>
+        <output-file value="/home/tara/codes/aco/networks/distance/distance.net.xml"/>
     </output>
 
     <processing>
@@ -29,15 +29,13 @@
     </pedestrian>
 
     <netedit>
-        <additional-files value="/home/tara/codes/aco/networks/rings/rings.original.add.xml"/>
+        <additional-files value="/home/tara/codes/aco/networks/distance/distance.original.add.xml"/>
     </netedit>
 
 </configuration>
 -->
 
 <additional xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/additional_file.xsd">
-    <parkingArea id="parkingArea_-gneE31_0_1" lane="-gneE31_0" friendlyPos="1" startPos="62.96" endPos="262.96"/>
-    <parkingArea id="parkingArea_-gneE32_0_3" lane="-gneE32_0" friendlyPos="1" startPos="30.55" endPos="230.55"/>
-    <parkingArea id="parkingArea_gneE30_0_2" lane="gneE30_0" friendlyPos="1" startPos="30.20" endPos="230.20"/>
-    <parkingArea id="parkingArea_gneE33_0_0" lane="gneE33_0" friendlyPos="1" startPos="48.44" endPos="248.44"/>
+    <parkingArea id="parkingArea_-gneE14_0_1" lane="-gneE14_0" friendlyPos="1" startPos="0.00" endPos="50.00"/>
+    <parkingArea id="parkingArea_gneE15_0_1" lane="gneE15_0" friendlyPos="1" startPos="43.07" endPos="93.07"/>
 </additional>
